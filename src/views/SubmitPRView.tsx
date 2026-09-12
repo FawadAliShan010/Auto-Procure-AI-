@@ -252,23 +252,21 @@ export const SubmitPRView: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* 1. Dedicated Demo Scenario Launchpad Banner */}
-      <div className="bg-white rounded-xl border border-indigo-200/90 p-4 sm:p-5 shadow-2xs relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-indigo-50 rounded-full blur-2xl pointer-events-none opacity-60" />
-        
+      <div className="bg-white rounded-xl border border-indigo-100 p-4 sm:p-5 shadow-2xs relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-[11px] font-bold uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                Featured Demo Scenario
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-[10px] font-mono font-bold uppercase tracking-wider">
+                <Sparkles className="w-3 h-3 text-indigo-600" />
+                Featured Test Scenarios
               </span>
-              <span className="text-xs text-slate-400 font-mono hidden sm:inline">• PRD Case Study</span>
+              <span className="text-xs text-slate-400 font-mono hidden sm:inline">• PRD Verification Suite</span>
             </div>
             <h3 className="text-sm font-bold text-slate-900">
-              Marcus (Operations) • 500 Safety Helmets with Typo
+              Interactive Gatekeeper Presets
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed max-w-xl">
-              Pre-populates an un-standardized requisition (<span className="font-mono text-slate-700 font-medium">"500 saftey helms for site refit project"</span>) to test Gate 1 typo correction, Gate 2 budget flags, Gate 3 multi-site stock transfers, and Gate 4 usage velocity checks.
+              Load realistic procurement requisitions with raw typos, budget variances, sister facility surplus, and velocity anomalies to audit all 4 gates.
             </p>
           </div>
 
@@ -281,7 +279,7 @@ export const SubmitPRView: React.FC = () => {
               onClick={handleLoadSteelPipeScenario}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-xs"
             >
-              Load Steel Pipe (Prompt Item)
+              Steel Pipe (Maintenance)
             </Button>
             <Button
               type="button"
@@ -290,7 +288,7 @@ export const SubmitPRView: React.FC = () => {
               onClick={handleLoadDemoScenario}
               className="text-xs text-slate-700 hover:text-indigo-600"
             >
-              Load Helmets (500 units)
+              500 Helmets (Marcus)
             </Button>
             <Button
               type="button"
@@ -299,7 +297,7 @@ export const SubmitPRView: React.FC = () => {
               onClick={handleLoadLowConfidenceScenario}
               className="text-xs text-purple-700 border-purple-200 hover:bg-purple-50"
             >
-              Test Low Confidence
+              Low Confidence Item
             </Button>
             <Button
               type="button"
@@ -308,7 +306,7 @@ export const SubmitPRView: React.FC = () => {
               onClick={handleLoadChargerScenario}
               className="text-xs text-slate-600 hover:text-indigo-600"
             >
-              Load IT Charger
+              IT Adapter
             </Button>
           </div>
         </div>

@@ -18,25 +18,25 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   let dotColor = 'bg-slate-400';
 
   if (norm === 'APPROVED' || norm === 'PASSED' || norm === 'PROCEED' || norm === 'OPTIMAL') {
-    colorClasses = 'bg-emerald-50 text-emerald-800 border-emerald-200/80';
+    colorClasses = 'bg-emerald-50 text-emerald-800 border-emerald-200/90 ring-1 ring-emerald-500/10';
     dotColor = 'bg-emerald-500';
   } else if (norm === 'REDUCE' || norm === 'WARNING') {
-    colorClasses = 'bg-amber-50 text-amber-900 border-amber-200/80';
+    colorClasses = 'bg-amber-50 text-amber-900 border-amber-200/90 ring-1 ring-amber-500/10';
     dotColor = 'bg-amber-500';
   } else if (norm === 'ON_HOLD' || norm === 'ON HOLD' || norm === 'HOLD') {
-    colorClasses = 'bg-orange-50 text-orange-800 border-orange-200/80';
+    colorClasses = 'bg-orange-50 text-orange-900 border-orange-200/90 ring-1 ring-orange-500/10';
     dotColor = 'bg-orange-500';
   } else if (norm === 'FOUND') {
-    colorClasses = 'bg-sky-50 text-sky-800 border-sky-200/80';
+    colorClasses = 'bg-sky-50 text-sky-800 border-sky-200/90 ring-1 ring-sky-500/10';
     dotColor = 'bg-sky-500';
-  } else if (norm === 'HIGH' || norm === 'FAILED' || norm === 'REJECTED') {
-    colorClasses = 'bg-rose-50 text-rose-800 border-rose-200/80';
+  } else if (norm === 'HIGH' || norm === 'FAILED' || norm === 'REJECTED' || norm === 'REJECT') {
+    colorClasses = 'bg-rose-50 text-rose-800 border-rose-200/90 ring-1 ring-rose-500/10';
     dotColor = 'bg-rose-500';
   } else if (norm === 'INVESTIGATE') {
-    colorClasses = 'bg-purple-50 text-purple-800 border-purple-200/80';
+    colorClasses = 'bg-purple-50 text-purple-800 border-purple-200/90 ring-1 ring-purple-500/10';
     dotColor = 'bg-purple-500';
-  } else if (norm === 'EXPEDITE') {
-    colorClasses = 'bg-indigo-50 text-indigo-800 border-indigo-200/80';
+  } else if (norm === 'EXPEDITE' || norm === 'EXPEDITED') {
+    colorClasses = 'bg-indigo-50 text-indigo-800 border-indigo-200/90 ring-1 ring-indigo-500/10';
     dotColor = 'bg-indigo-500';
   }
 
@@ -52,7 +52,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-md border uppercase ${sizeClasses} ${colorClasses} whitespace-nowrap shadow-2xs`}
+      className={`inline-flex items-center gap-1.5 rounded-md border uppercase font-mono ${sizeClasses} ${colorClasses} whitespace-nowrap shadow-2xs`}
     >
       {showDot && <span className={`w-1.5 h-1.5 rounded-full ${dotColor} shrink-0`} />}
       <span>{displayLabel}</span>

@@ -545,34 +545,46 @@ export function evaluateProcurementDecision(
   // RULE 4 & RULE 3: Excessive Usage (Months of Supply) OR Substantial Internal Transfer Opportunities
   else if (flags.excessiveMonthsOfSupply || hasMatchingOtherStock) {
     decision = 'REDUCE';
-    headline = 'Requisition volume resized: internal warehouse stock transfers and run-rate adjustments applied.';
+    headline = 'Requisition volume reduced: internal inventory utilized and run-rate adjusted.';
 
-    if (flags.excessiveMonthsOfSupply) {
-      reasoning.push(`Requested quantity of ${input.quantity} units represents ${coverageMonths} months of supply based on 90-day usage (${averageMonthlyUsage} units/mo).`);
+    if (budgetVariance > 0) {
+      reasoning.push(`Budget exceeded ($${totalCost.toLocaleString()} requested vs $${input.availableBudget.toLocaleString()} available)`);
     }
 
     if (hasMatchingOtherStock) {
-      reasoning.push(`Identified ${availableTransferStock} transferable units across sister warehouses (${primaryTransferSource || 'Depot B'}).`);
+      reasoning.push(`${availableTransferStock} matching units found at another warehouse (${primaryTransferSource || 'Warehouse B'})`);
+    }
+
+    if (flags.excessiveMonthsOfSupply) {
+      reasoning.push(`Requested quantity exceeds historical usage (${coverageMonths} months vs ${averageMonthlyUsage} units/mo average)`);
+    }
+
+    if (transferQuantity > 0) {
+      reasoning.push('Internal inventory can satisfy most of the requirement');
+    }
+
+    if (hasMatchingOtherStock) {
       recommendedActions.push({
         type: 'transfer',
-        text: `Transfer ${transferQuantity} units from ${primaryTransferSource || 'sister warehouse'}`,
+        text: `Transfer ${transferQuantity} units from ${primaryTransferSource || 'Warehouse B'}.`,
         quantity: transferQuantity,
-        site: primaryTransferSource,
+        site: primaryTransferSource || 'Warehouse B',
       });
     }
 
     if (recommendedQuantity > 0) {
-      reasoning.push(`External procurement adjusted from ${input.quantity} to ${recommendedQuantity} units to avoid inventory carrying costs.`);
       recommendedActions.push({
         type: 'purchase',
-        text: `Issue external purchase order for ${recommendedQuantity} buffer units`,
+        text: `Purchase only ${recommendedQuantity} units externally.`,
         quantity: recommendedQuantity,
       });
     } else {
-      reasoning.push('100% of requirement satisfied via internal transfer; external PO avoided completely.');
+      recommendedActions.push({
+        type: 'purchase',
+        text: 'External PO canceled; 100% fulfilled internally.',
+        quantity: 0,
+      });
     }
-
-    reasoning.push(`Total cost avoidance achieved: $${estimatedSavings.toLocaleString()} ($${transferSavings.toLocaleString()} transfer + $${volumeReductionSavings.toLocaleString()} volume reduction).`);
   }
   // RULE 5: All Gates Pass Cleanly
   else {
@@ -698,7 +710,7 @@ export const DEMO_DECISION_SCENARIOS: DecisionDemoScenario[] = [
     input: {
       standardizedItem: 'Safety Helmet ANSI Z89.1',
       itemCode: 'HS-9912',
-      itemMatchingConfidence: 0.96,
+      itemMatchingConfidence: 0.94,
       quantity: 500,
       unitPrice: 25,
       department: 'Operations',

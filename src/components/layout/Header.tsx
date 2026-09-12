@@ -8,7 +8,9 @@ import {
   Plus,
   Command,
   ChevronDown,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
 import { AITestSuiteModal } from '../common/AITestSuiteModal';
 
@@ -18,9 +20,20 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
   const { navigateTo, requests, setSelectedRequestForModal, addToast, currentUser, updateDraft } = useProcure();
+  const { signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isAITestOpen, setIsAITestOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      addToast('Signed Out', 'You have been successfully signed out.', 'info');
+      navigateTo('/login');
+    } catch (err: any) {
+      console.error('Sign out error:', err);
+    }
+  };
 
   const filteredRequests = searchQuery.trim()
     ? requests.filter(
@@ -45,22 +58,26 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search requests, SKUs, GL codes, or requesters..."
+            placeholder="Search requests, items, codes, or requesters..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setShowSearchResults(true);
             }}
             onFocus={() => setShowSearchResults(true)}
-            className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-colors"
+            className="w-full pl-9 pr-14 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all focus:bg-white"
           />
-          {searchQuery && (
+          {searchQuery ? (
             <button
               onClick={() => setSearchQuery('')}
               className="absolute right-2.5 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
             >
               ✕
             </button>
+          ) : (
+            <kbd className="absolute right-2.5 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-white border border-slate-200 rounded shadow-2xs pointer-events-none">
+              ⌘K
+            </kbd>
           )}
         </div>
 
@@ -117,18 +134,19 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
         {/* Gemini AI Integration Test Suite Button */}
         <button
           onClick={() => setIsAITestOpen(true)}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200 text-indigo-700 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
-          title="Open Gemini AI Integration Test Suite (Successful, Malformed, Unavailable, Low Confidence tests)"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-semibold transition-all cursor-pointer shadow-2xs hover:shadow-xs"
+          title="Open Gemini AI Integration Test Suite"
         >
           <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
           <span className="hidden sm:inline">AI Test Suite</span>
-          <span className="text-[10px] bg-indigo-200/60 text-indigo-800 px-1.5 py-0.2 rounded font-mono">Gemini 3.8</span>
+          <span className="text-[9px] bg-indigo-200/60 text-indigo-800 px-1.5 py-0.2 rounded font-mono font-bold">Gemini 3.8</span>
         </button>
 
         {/* ERP System Status */}
-        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200/80 text-[11px] font-semibold text-emerald-800">
+        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200/80 text-[11px] font-semibold text-emerald-800 shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <Database className="w-3.5 h-3.5 text-emerald-600" />
-          <span>SAP S/4HANA: Live</span>
+          <span>SAP S/4HANA</span>
         </div>
 
         {/* Submit PR Quick Button */}
@@ -155,6 +173,31 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
           <Bell className="w-4 h-4" />
           <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-indigo-600 ring-2 ring-white" />
         </button>
+
+        {/* User Profile & Sign Out */}
+        <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+          <img
+            src={currentUser.avatarUrl}
+            alt={currentUser.name}
+            referrerPolicy="no-referrer"
+            className="w-7 h-7 rounded-full object-cover border border-slate-200"
+          />
+          <div className="hidden lg:block text-left">
+            <div className="text-xs font-semibold text-slate-800 leading-tight truncate max-w-[120px]">
+              {currentUser.name}
+            </div>
+            <div className="text-[10px] text-slate-400 truncate max-w-[120px]">
+              {currentUser.email || currentUser.role}
+            </div>
+          </div>
+          <button
+            onClick={handleSignOut}
+            title="Sign out"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* AI Test Suite Modal */}

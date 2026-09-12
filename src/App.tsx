@@ -1,5 +1,7 @@
 import React from 'react';
+import { AuthProvider } from './context/AuthContext';
 import { ProcurementProvider, useProcure } from './context/ProcurementContext';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoginView } from './views/LoginView';
 import { DashboardView } from './views/DashboardView';
@@ -44,26 +46,30 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <AppLayout>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentRoute}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.18 }}
-        >
-          {renderCurrentView()}
-        </motion.div>
-      </AnimatePresence>
-    </AppLayout>
+    <ProtectedRoute>
+      <AppLayout>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentRoute}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+          >
+            {renderCurrentView()}
+          </motion.div>
+        </AnimatePresence>
+      </AppLayout>
+    </ProtectedRoute>
   );
 };
 
 export default function App() {
   return (
-    <ProcurementProvider>
-      <AppContent />
-    </ProcurementProvider>
+    <AuthProvider>
+      <ProcurementProvider>
+        <AppContent />
+      </ProcurementProvider>
+    </AuthProvider>
   );
 }

@@ -72,10 +72,14 @@ export const ProcessingView: React.FC = () => {
           gate4: output.gate4,
           decisionResult: output.decisionResult,
           status:
-            output.decisionResult.decision === 'PROCEED'
+            output.decisionResult.decision === 'PROCEED' || output.decisionResult.decision === 'APPROVE'
               ? ('APPROVED' as const)
-              : output.decisionResult.decision === 'HOLD' || output.decisionResult.decision === 'REDUCE'
+              : output.decisionResult.decision === 'REDUCE'
+              ? ('REDUCE' as const)
+              : output.decisionResult.decision === 'HOLD'
               ? ('ON_HOLD' as const)
+              : output.decisionResult.decision === 'EXPEDITE'
+              ? ('EXPEDITED' as const)
               : output.decisionResult.decision === 'INVESTIGATE'
               ? ('INVESTIGATE' as const)
               : ('REJECTED' as const),

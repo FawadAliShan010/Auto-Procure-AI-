@@ -10,6 +10,7 @@ import {
   INITIAL_PURCHASE_REQUESTS,
 } from '../data/mockProcurementData';
 import { analyzePurchaseRequest } from '../services/procurementEngine';
+import { useAuth } from './AuthContext';
 
 interface ProcurementContextType {
   currentRoute: RoutePath;
@@ -68,8 +69,20 @@ export const ProcurementProvider: React.FC<{ children: ReactNode }> = ({ childre
     return INITIAL_PURCHASE_REQUESTS;
   };
 
+  const { userProfile } = useAuth();
   const [currentRoute, setCurrentRoute] = useState<RoutePath>(getInitialRoute);
-  const [currentUser, setCurrentUser] = useState<UserProfile>(CURRENT_USER);
+  const [currentUser, setCurrentUser] = useState<UserProfile>(userProfile || CURRENT_USER);
+
+  // Sync currentUser with authenticated Google user
+  useEffect(() => {
+    if (userProfile) {
+      setCurrentUser(userProfile);
+      setActiveDraft((prev) => ({
+        ...prev,
+        employeeName: userProfile.name,
+      }));
+    }
+  }, [userProfile]);
   const [requests, setRequests] = useState<PurchaseRequest[]>(getInitialRequests);
   const [activeDraft, setActiveDraft] = useState<Partial<PurchaseRequest>>({
     employeeName: CURRENT_USER.name,
@@ -158,10 +171,14 @@ export const ProcurementProvider: React.FC<{ children: ReactNode }> = ({ childre
     const analysis = analyzePurchaseRequest(draft);
 
     const initialStatus: PurchaseRequest['status'] =
-      analysis.decisionResult.decision === 'PROCEED'
+      analysis.decisionResult.decision === 'PROCEED' || analysis.decisionResult.decision === 'APPROVE'
         ? 'APPROVED'
-        : analysis.decisionResult.decision === 'REDUCE' || analysis.decisionResult.decision === 'HOLD'
+        : analysis.decisionResult.decision === 'REDUCE'
+        ? 'REDUCE'
+        : analysis.decisionResult.decision === 'HOLD'
         ? 'ON_HOLD'
+        : analysis.decisionResult.decision === 'EXPEDITE'
+        ? 'EXPEDITED'
         : analysis.decisionResult.decision === 'INVESTIGATE'
         ? 'INVESTIGATE'
         : analysis.decisionResult.decision === 'REJECT' || analysis.decisionResult.decision === 'REJECTED'
