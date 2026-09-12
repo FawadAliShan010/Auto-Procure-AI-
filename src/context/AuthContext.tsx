@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import {
   auth,
   signInWithGoogle as fbSignInWithGoogle,
+  signInWithEmail as fbSignInWithEmail,
+  signUpWithEmail as fbSignUpWithEmail,
   signOutUser as fbSignOutUser,
   onAuthStateChanged,
   User,
@@ -16,6 +18,8 @@ interface AuthContextType {
   isAuthLoading: boolean;
   authError: string | null;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, pass: string) => Promise<void>;
+  signUpWithEmail: (email: string, pass: string, displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearAuthError: () => void;
   // Fallback demo sign-in for testing without popup restrictions
@@ -24,7 +28,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const formatGoogleProfile = (firebaseUser: User): UserProfile => {
+const formatUserProfile = (firebaseUser: User): UserProfile => {
   const name = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Enterprise User';
   return {
     id: firebaseUser.uid,
@@ -51,7 +55,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       (firebaseUser) => {
         if (firebaseUser) {
           setUser(firebaseUser);
-          setUserProfile(formatGoogleProfile(firebaseUser));
+          setUserProfile(formatUserProfile(firebaseUser));
           setAuthError(null);
         } else {
           setUser(null);
@@ -75,9 +79,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAuthError(null);
       const fbUser = await fbSignInWithGoogle();
       setUser(fbUser);
-      setUserProfile(formatGoogleProfile(fbUser));
+      setUserProfile(formatUserProfile(fbUser));
     } catch (err: any) {
       const message = err.message || 'Unable to sign in. Please try again.';
+      setAuthError(message);
+      throw err;
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const signInWithEmail = async (email: string, pass: string): Promise<void> => {
+    try {
+      setIsAuthLoading(true);
+      setAuthError(null);
+      const fbUser = await fbSignInWithEmail(email, pass);
+      setUser(fbUser);
+      setUserProfile(formatUserProfile(fbUser));
+    } catch (err: any) {
+      const message = err.message || 'Unable to sign in. Please try again.';
+      setAuthError(message);
+      throw err;
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const signUpWithEmail = async (
+    email: string,
+    pass: string,
+    displayName: string
+  ): Promise<void> => {
+    try {
+      setIsAuthLoading(true);
+      setAuthError(null);
+      const fbUser = await fbSignUpWithEmail(email, pass, displayName);
+      setUser(fbUser);
+      setUserProfile(formatUserProfile(fbUser));
+    } catch (err: any) {
+      const message = err.message || 'Unable to create account. Please try again.';
       setAuthError(message);
       throw err;
     } finally {
@@ -117,6 +157,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     isAuthLoading,
     authError,
     signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
     signOut,
     clearAuthError,
     signInWithDemo,
