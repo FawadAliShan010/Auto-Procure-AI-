@@ -35,6 +35,7 @@ import { PurchaseRequest, PRStatus, isRequisitionerRole } from '../types/procure
 export const RecommendationView: React.FC = () => {
   const {
     currentAnalysisPR,
+    requests,
     approveAndSendToERP,
     updateRequestStatus,
     navigateTo,
@@ -163,17 +164,17 @@ export const RecommendationView: React.FC = () => {
     },
   };
 
-  const activePR = currentAnalysisPR || demoFallbackPR;
+  const activePR = currentAnalysisPR || requests[0] || demoFallbackPR;
   const decisionResult = activePR.decisionResult || demoFallbackPR.decisionResult!;
 
   // Calculations for Summary
-  const itemTitle = activePR.gate1?.standardized || 'Safety Helmet ANSI Z89.1';
-  const itemCode = activePR.gate1?.matchedItemCode || 'HS-9912';
+  const itemTitle = activePR.gate1?.standardized || activePR.itemDescription || 'Requisition Item';
+  const itemCode = activePR.gate1?.matchedItemCode || 'REQ-001';
   const department = activePR.department || 'Operations';
-  const purchaseQty = decisionResult.purchaseQuantity ?? 50;
-  const transferQty = decisionResult.transferQuantity ?? 350;
+  const purchaseQty = decisionResult.purchaseQuantity ?? activePR.quantity;
+  const transferQty = decisionResult.transferQuantity ?? activePR.gate3?.recommendedTransferQuantity ?? 0;
   const totalQtyAfterAdjustment = purchaseQty + transferQty;
-  const estimatedSavings = decisionResult.estimatedSavings ?? 11250;
+  const estimatedSavings = decisionResult.estimatedSavings ?? 0;
 
   // Final Action Text Formulation
   const finalActionTitle =

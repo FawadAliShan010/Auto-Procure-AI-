@@ -53,6 +53,31 @@ export function analyzePurchaseRequest(input: Partial<PurchaseRequest>): {
   } else if (lower.includes('chair') || lower.includes('ergo') || lower.includes('desk')) {
     matchedItem = ITEM_MASTER_CATALOG[3]; // Chair
     typosFound.push('Standardized to ergonomic master catalog specification');
+  } else if (lower.includes('hydraul') || lower.includes('seal') || lower.includes('kit')) {
+    matchedItem = {
+      sku: '#HYD-SEAL-09',
+      officialTitle: 'Hydraulic Seal Kit',
+      category: 'Hydraulics & Seals',
+      glCode: '5140',
+      glName: 'Machine Components',
+      standardUnitPrice: 75,
+      avgMonthlyConsumption: 8,
+      localWarehouseStock: 0,
+      sisterSiteStock: [
+        { siteId: 'WH-B', siteName: 'Warehouse B', quantity: 15, status: 'reserve' },
+      ],
+      warehouses: [
+        { warehouseId: 'WH-A', name: 'Warehouse A', quantity: 0, location: 'Local Central Depot', stockStatus: 'Out of Stock', isLocal: true },
+        { warehouseId: 'WH-B', name: 'Warehouse B', quantity: 15, location: 'Plant 4 Storage, Bay 7', stockStatus: 'Reserved', isLocal: false },
+        { warehouseId: 'WH-C', name: 'Warehouse C', quantity: 0, location: 'Regional Yard C', stockStatus: 'Out of Stock', isLocal: false },
+      ],
+      preceding90Days: [
+        { month: 'Jun', usage: 7 },
+        { month: 'Jul', usage: 9 },
+        { month: 'Aug', usage: 8 },
+      ],
+    };
+    typosFound.push('Mapped to ISO-4406 fluid seal specs');
   } else {
     // Default / Charger
     matchedItem = ITEM_MASTER_CATALOG[0];

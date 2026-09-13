@@ -53,6 +53,7 @@ import { recordAuditLog, createManagerDecisionDoc } from '../services/persistent
 export const DecisionView: React.FC = () => {
   const {
     currentAnalysisPR,
+    requests,
     navigateTo,
     addToast,
     updateRequestStatus,
@@ -66,8 +67,18 @@ export const DecisionView: React.FC = () => {
   const [thresholds, setThresholds] = useState<DecisionEngineThresholds>(DEFAULT_DECISION_THRESHOLDS);
   const [showThresholdConfig, setShowThresholdConfig] = useState(false);
   
-  // Default to SCENARIO-REDUCE as specified in user requirements
-  const [activeScenarioId, setActiveScenarioId] = useState<string>('SCENARIO-REDUCE');
+  const pr = currentAnalysisPR || requests[0];
+
+  // Default to CURRENT_PR if a requisition is available, else SCENARIO-REDUCE
+  const [activeScenarioId, setActiveScenarioId] = useState<string>(
+    pr ? 'CURRENT_PR' : 'SCENARIO-REDUCE'
+  );
+
+  useEffect(() => {
+    if (pr) {
+      setActiveScenarioId('CURRENT_PR');
+    }
+  }, [pr]);
   const [selfTestResults, setSelfTestResults] = useState<ReturnType<typeof runDecisionEngineSelfTest> | null>(null);
   const [verificationSummary, setVerificationSummary] = useState<VerificationSuiteSummary | null>(null);
   const [isRunningVerification, setIsRunningVerification] = useState(false);
@@ -109,7 +120,6 @@ export const DecisionView: React.FC = () => {
     note: string;
   } | null>(null);
 
-  const pr = currentAnalysisPR;
   const isManager = isPurchaseManagerRole(currentUser?.role);
 
   // Active inputs for decision evaluation
