@@ -21,6 +21,7 @@ import {
   XCircle,
   HelpCircle,
   RotateCcw,
+  Database,
 } from 'lucide-react';
 
 export const DashboardView: React.FC = () => {
@@ -138,6 +139,18 @@ export const DashboardView: React.FC = () => {
           >
             Refresh
           </Button>
+
+          {currentUser?.role !== 'REQUISITIONER' && (
+            <Button
+              variant="outline"
+              size="md"
+              leftIcon={<Database className="w-4 h-4 text-indigo-600" />}
+              onClick={() => navigateTo('/historical-data')}
+              className="shadow-2xs font-semibold border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+            >
+              Historical Data (Excel)
+            </Button>
+          )}
 
           <Button
             variant="primary"

@@ -1,25 +1,29 @@
 import React from 'react';
 import { useProcure } from '../../context/ProcurementContext';
-import { RoutePath } from '../../types/procurement';
-import { ALTERNATE_USER, CURRENT_USER } from '../../data/mockProcurementData';
+import { RoutePath, normalizeRole } from '../../types/procurement';
+import { DEMO_PERSONAS } from '../../data/mockProcurementData';
 import {
   Home,
   PlusCircle,
   FileText,
   BarChart3,
   Settings,
+  Database,
   Sparkles,
   Hexagon,
   ArrowLeftRight,
   ShieldCheck,
   CheckCircle2,
   LogOut,
+  Lock,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { UserAvatar } from '../common/UserAvatar';
 
 export const Sidebar: React.FC = () => {
   const { currentRoute, navigateTo, currentUser, switchUser, addToast } = useProcure();
-  const { signOut } = useAuth();
+  const { signOut, isDemoSession, signInWithDemo } = useAuth();
 
   const handleSignOut = async () => {
     try {
@@ -31,19 +35,50 @@ export const Sidebar: React.FC = () => {
     }
   };
 
-  const navItems: Array<{ path: RoutePath; label: string; icon: React.FC<{ className?: string }> }> = [
+  const role = normalizeRole(currentUser.role);
+  const isReq = role === 'REQUISITIONER';
+  const isMgr = role === 'PURCHASE_MANAGER';
+  const isAdmin = role === 'ADMIN';
+
+  const navItems: Array<{
+    path: RoutePath;
+    label: string;
+    icon: React.FC<{ className?: string }>;
+    badge?: string;
+  }> = [
     { path: '/dashboard', label: 'Home', icon: Home },
-    { path: '/submit', label: 'Submit PR', icon: PlusCircle },
-    { path: '/requests', label: 'My Requests', icon: FileText },
-    { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-    { path: '/settings', label: 'Settings', icon: Settings },
+    { path: '/submit', label: 'Submit PR', icon: PlusCircle, badge: 'AI GATE' },
+    {
+      path: '/requests',
+      label: isReq ? 'My Requests' : 'Requisitions',
+      icon: FileText,
+    },
+    ...(!isReq
+      ? [
+          {
+            path: '/historical-data' as RoutePath,
+            label: 'Historical Data',
+            icon: Database,
+            badge: 'EXCEL',
+          },
+          { path: '/analytics' as RoutePath, label: 'Analytics', icon: BarChart3 },
+        ]
+      : []),
+    {
+      path: '/settings',
+      label: isAdmin ? 'Admin & Settings' : isReq ? 'My Profile' : 'Settings',
+      icon: Settings,
+      badge: isAdmin ? 'ADMIN' : undefined,
+    },
   ];
 
-  const handleToggleUser = () => {
-    if (currentUser.id === CURRENT_USER.id) {
-      switchUser(ALTERNATE_USER);
-    } else {
-      switchUser(CURRENT_USER);
+  const handleCyclePersona = () => {
+    const currentIndex = DEMO_PERSONAS.findIndex((p) => p.id === currentUser.id);
+    const nextIndex = (currentIndex + 1) % DEMO_PERSONAS.length;
+    const nextPersona = DEMO_PERSONAS[nextIndex];
+    switchUser(nextPersona);
+    if (isDemoSession) {
+      signInWithDemo(nextPersona);
     }
   };
 
@@ -65,15 +100,30 @@ export const Sidebar: React.FC = () => {
                 v2.4
               </span>
             </div>
-            <span className="text-[10px] text-slate-400 block font-medium truncate">Pre-Submission Gatekeeper</span>
+            <span className="text-[10px] text-slate-400 block font-medium truncate">
+              Pre-Submission Gatekeeper
+            </span>
           </div>
         </div>
 
         {/* Primary Navigation List */}
         <div className="px-3 pt-4 pb-2">
-          <span className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-            Platform Menu
-          </span>
+          <div className="flex items-center justify-between px-2.5 mb-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Platform Menu
+            </span>
+            <span
+              className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                isAdmin
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                  : isMgr
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+              }`}
+            >
+              {role}
+            </span>
+          </div>
           <nav className="space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -98,11 +148,21 @@ export const Sidebar: React.FC = () => {
                   {isActive && (
                     <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-white rounded-r-full" />
                   )}
-                  <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`} />
+                  <Icon
+                    className={`w-4 h-4 shrink-0 transition-colors ${
+                      isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+                    }`}
+                  />
                   <span className="truncate">{item.label}</span>
-                  {item.path === '/submit' && (
-                    <span className="ml-auto text-[9px] uppercase font-mono font-bold tracking-wider px-1.5 py-0.5 rounded bg-indigo-400/20 text-indigo-200 border border-indigo-400/30">
-                      AI GATE
+                  {item.badge && (
+                    <span
+                      className={`ml-auto text-[9px] uppercase font-mono font-bold tracking-wider px-1.5 py-0.5 rounded border ${
+                        item.badge === 'ADMIN'
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          : 'bg-indigo-400/20 text-indigo-200 border-indigo-400/30'
+                      }`}
+                    >
+                      {item.badge}
                     </span>
                   )}
                 </button>
@@ -126,7 +186,12 @@ export const Sidebar: React.FC = () => {
               {[
                 { path: '/submit' as RoutePath, num: '01', label: 'Submit PR' },
                 { path: '/analysis' as RoutePath, num: '02', label: '4-Gate Audit' },
-                { path: '/decision' as RoutePath, num: '03', label: 'AI Decision' },
+                {
+                  path: '/decision' as RoutePath,
+                  num: '03',
+                  label: isReq ? 'Manager Decision' : 'AI Decision',
+                  restricted: isReq,
+                },
                 { path: '/recommendation' as RoutePath, num: '04', label: 'Recommendation' },
               ].map((step) => {
                 const isStepActive = currentRoute === step.path;
@@ -134,16 +199,25 @@ export const Sidebar: React.FC = () => {
                   <button
                     key={step.path}
                     onClick={() => navigateTo(step.path)}
-                    className={`w-full text-left text-xs py-1.5 px-2.5 rounded-lg flex items-center gap-2.5 transition-all cursor-pointer ${
+                    className={`w-full text-left text-xs py-1.5 px-2.5 rounded-lg flex items-center justify-between transition-all cursor-pointer ${
                       isStepActive
                         ? 'text-white font-semibold bg-indigo-600/30 border border-indigo-500/40 shadow-xs'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                     }`}
                   >
-                    <span className={`text-[10px] font-mono font-bold ${isStepActive ? 'text-indigo-400' : 'text-slate-400'}`}>
-                      {step.num}
-                    </span>
-                    <span className="truncate">{step.label}</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`text-[10px] font-mono font-bold ${
+                          isStepActive ? 'text-indigo-400' : 'text-slate-400'
+                        }`}
+                      >
+                        {step.num}
+                      </span>
+                      <span className="truncate">{step.label}</span>
+                    </div>
+                    {step.restricted && (
+                      <Lock className="w-3 h-3 text-slate-500 shrink-0 ml-1" />
+                    )}
                   </button>
                 );
               })}
@@ -152,25 +226,24 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* User Card & Persona Switcher */}
+      {/* User Card & 3-Role Persona Switcher */}
       <div className="p-3 border-t border-slate-800/80 bg-[#090E1A] space-y-2">
         <div className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-900/80 border border-slate-800/80 hover:border-slate-700 transition-colors">
-          <div className="relative shrink-0">
-            <img
-              src={currentUser.avatarUrl}
-              alt={currentUser.name}
-              referrerPolicy="no-referrer"
-              className="w-8 h-8 rounded-full object-cover border border-slate-700"
-            />
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-900" />
-          </div>
+          <UserAvatar
+            id="sidebar-user-avatar"
+            name={currentUser.name}
+            avatarUrl={currentUser.avatarUrl}
+            role={currentUser.role}
+            size="md"
+            showRoleBadge={true}
+          />
           <div className="flex-1 min-w-0">
             <h4 className="text-xs font-semibold text-white truncate">{currentUser.name}</h4>
-            <p className="text-[10px] text-slate-400 truncate">{currentUser.email || currentUser.role}</p>
+            <p className="text-[10px] text-slate-400 truncate font-mono">{role}</p>
           </div>
           <button
-            onClick={handleToggleUser}
-            title="Switch User Persona (Fawad Ali Shan ↔ Marcus Vance)"
+            onClick={handleCyclePersona}
+            title="Cycle Test Persona (Requisitioner → Manager → Admin)"
             className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
           >
             <ArrowLeftRight className="w-3.5 h-3.5" />

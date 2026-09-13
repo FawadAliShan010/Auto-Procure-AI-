@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
@@ -9,7 +10,8 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Master catalog reference for Gemini to ground SKU recommendations
 const ERP_CATALOG_KNOWLEDGE = [
@@ -329,7 +331,7 @@ Strictly output JSON complying with the requested schema.
           },
         },
       }),
-      4000,
+      12000,
       'Gemini standardization timeout'
     );
 
@@ -501,7 +503,7 @@ Requirements:
           },
         },
       }),
-      4000,
+      12000,
       'Gemini reasoning timeout'
     );
 
@@ -678,6 +680,87 @@ app.post('/api/gemini/test-suite', async (req: Request, res: Response) => {
     executedAt: new Date().toISOString(),
     results,
   });
+});
+
+// 5. File Storage for Uploaded Excel/CSV Spreadsheets
+const UPLOADS_DIR = path.join(process.cwd(), 'data', 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Upload file endpoint
+app.post('/api/files/upload', (req: Request, res: Response) => {
+  try {
+    const { filename, fileType, fileBase64 } = req.body;
+    if (!filename || !fileBase64) {
+      return res.status(400).json({ error: 'filename and fileBase64 are required' });
+    }
+
+    const fileId = `FILE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const diskFilename = `${fileId}_${safeFilename}`;
+    const filePath = path.join(UPLOADS_DIR, diskFilename);
+
+    const buffer = Buffer.from(fileBase64, 'base64');
+    fs.writeFileSync(filePath, buffer);
+
+    const downloadUrl = `/api/files/download/${fileId}`;
+    const storagePath = `server_storage://uploads/${diskFilename}`;
+
+    return res.json({
+      success: true,
+      fileId,
+      filename: safeFilename,
+      downloadUrl,
+      storagePath,
+      size: buffer.length,
+      fileType: fileType || 'application/octet-stream',
+      uploadedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('Error saving uploaded file:', error);
+    return res.status(500).json({ error: error?.message || 'Failed to save file' });
+  }
+});
+
+// Download/view file endpoint
+app.get('/api/files/download/:fileId', (req: Request, res: Response) => {
+  const { fileId } = req.params;
+  try {
+    const files = fs.readdirSync(UPLOADS_DIR);
+    const targetFile = files.find((f) => f.startsWith(`${fileId}_`));
+    if (!targetFile) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    const filePath = path.join(UPLOADS_DIR, targetFile);
+    const originalName = targetFile.replace(`${fileId}_`, '');
+    res.download(filePath, originalName);
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Failed to retrieve file' });
+  }
+});
+
+// List uploaded files endpoint
+app.get('/api/files', (req: Request, res: Response) => {
+  try {
+    const files = fs.readdirSync(UPLOADS_DIR);
+    const list = files.map((f) => {
+      const parts = f.split('_');
+      const fileId = parts[0];
+      const name = parts.slice(1).join('_');
+      const stat = fs.statSync(path.join(UPLOADS_DIR, f));
+      return {
+        fileId,
+        filename: name,
+        size: stat.size,
+        createdAt: stat.birthtime.toISOString(),
+        downloadUrl: `/api/files/download/${fileId}`,
+      };
+    });
+    res.json({ files: list });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to list files' });
+  }
 });
 
 // ----------------------------------------------------------------------------

@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../common/Button';
 import { AITestSuiteModal } from '../common/AITestSuiteModal';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface HeaderProps {
   onToggleMobileMenu?: () => void;
@@ -176,11 +177,13 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
 
         {/* User Profile & Sign Out */}
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-          <img
-            src={currentUser.avatarUrl}
-            alt={currentUser.name}
-            referrerPolicy="no-referrer"
-            className="w-7 h-7 rounded-full object-cover border border-slate-200"
+          <UserAvatar
+            id="header-user-avatar"
+            name={currentUser.name}
+            avatarUrl={currentUser.avatarUrl}
+            role={currentUser.role}
+            size="sm"
+            showRoleBadge={true}
           />
           <div className="hidden lg:block text-left">
             <div className="text-xs font-semibold text-slate-800 leading-tight truncate max-w-[120px]">

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useProcure } from '../context/ProcurementContext';
 import { Button } from '../components/common/Button';
+import { ProfilePictureUploadCard } from '../components/profile/ProfilePictureUploadCard';
+import { isPurchaseManagerRole } from '../types/procurement';
 import {
   Settings,
   Database,
@@ -9,10 +11,11 @@ import {
   CheckCircle2,
   RefreshCw,
   Save,
+  ArrowRight,
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
-  const { addToast } = useProcure();
+  const { addToast, currentUser, navigateTo } = useProcure();
 
   const [erpTarget, setErpTarget] = useState('SAP_S4HANA');
   const [budgetTolerance, setBudgetTolerance] = useState('5');
@@ -34,13 +37,50 @@ export const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
+    <div className="max-w-3xl mx-auto space-y-6">
       <div className="pb-2 border-b border-slate-200/80">
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">System Parameters & ERP Connectors</h1>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">User Profile & System Parameters</h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Configure downstream ERP endpoints, verification gate tolerances, and sister-depot transfer policies.
+          Manage your verified enterprise identity, Cloud Storage avatar, downstream ERP connectors, and audit gate rules.
         </p>
       </div>
+
+      {/* Enterprise Identity & Profile Picture Upload Card */}
+      <ProfilePictureUploadCard />
+
+      {/* Historical Data Management Card (Purchase Managers & Admins) */}
+      {isPurchaseManagerRole(currentUser.role) && (
+        <div className="bg-white rounded-xl border border-indigo-100 p-5 shadow-2xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+                <Database className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900">Historical Procurement Ingestion</h3>
+                  <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.2 rounded">
+                    STAGE 1–3
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Upload Excel/CSV spreadsheets to seed historical consumption & purchase data with Gate 1 cleaning.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+              onClick={() => navigateTo('/historical-data')}
+              className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 shrink-0"
+            >
+              Open Data Pipeline
+            </Button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSave} className="space-y-5">
         {/* ERP Integration Target */}

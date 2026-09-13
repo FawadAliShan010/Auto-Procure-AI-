@@ -3,8 +3,8 @@ import { PurchaseRequest, UserProfile } from '../types/procurement';
 export const CURRENT_USER: UserProfile = {
   id: 'usr-101',
   name: 'Fawad Ali Shan',
-  email: 'fawad.alishan@alfuttaim.com',
-  role: 'Procurement Director',
+  email: 'fawad.alishan@enterprise.com',
+  role: 'PURCHASE_MANAGER',
   department: 'Procurement & Supply Chain',
   avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
 };
@@ -13,10 +13,25 @@ export const ALTERNATE_USER: UserProfile = {
   id: 'usr-102',
   name: 'Marcus Vance',
   email: 'marcus.vance@apexgroup.com',
-  role: 'Department Requisitioner',
+  role: 'REQUISITIONER',
   department: 'Maintenance / Operations',
   avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
 };
+
+export const ADMIN_USER: UserProfile = {
+  id: 'usr-100',
+  name: 'Sarah Chen',
+  email: 'sarah.chen@enterprise.com',
+  role: 'ADMIN',
+  department: 'Governance & Enterprise Administration',
+  avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+};
+
+export const DEMO_PERSONAS: UserProfile[] = [
+  ALTERNATE_USER,
+  CURRENT_USER,
+  ADMIN_USER,
+];
 
 export interface MasterCatalogItem {
   sku: string;

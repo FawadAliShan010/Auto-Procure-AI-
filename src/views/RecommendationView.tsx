@@ -27,9 +27,10 @@ import {
   AlertCircle,
   Cpu,
   FileText,
+  Lock,
 } from 'lucide-react';
 import { DEMO_DECISION_SCENARIOS, evaluateProcurementDecision } from '../services/decisionEngine';
-import { PurchaseRequest, PRStatus } from '../types/procurement';
+import { PurchaseRequest, PRStatus, isRequisitionerRole } from '../types/procurement';
 
 export const RecommendationView: React.FC = () => {
   const {
@@ -199,8 +200,19 @@ export const RecommendationView: React.FC = () => {
       ? `Fast-track expedited order for ${purchaseQty} units with next-day air freight.`
       : 'Review compliance notes before releasing procurement commitment.';
 
+  const isRequisitioner = isRequisitionerRole(currentUser.role);
+
   // Simulate ERP Handshake with interactive steps
   const handleApproveAndSendToERP = () => {
+    if (isRequisitioner) {
+      addToast(
+        'Approval Authority Required',
+        'Requisitioners cannot commit POs to ERP directly (Segregation of Duties). Please switch to Sarah Chen (Purchase Manager) or Admin in the sidebar to authorize.',
+        'warning'
+      );
+      return;
+    }
+
     setIsSimulatingERP(true);
     setSimulationStep('Synthesizing SAP S/4HANA BAPI payload (BAPI_PO_CREATE1)...');
 
@@ -217,7 +229,13 @@ export const RecommendationView: React.FC = () => {
       const generatedTO = `TR-${Math.floor(1000 + Math.random() * 9000)}`;
       const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-      approveAndSendToERP(activePR.id);
+      const approved = approveAndSendToERP(activePR.id);
+      if (!approved) {
+        setIsSimulatingERP(false);
+        setSimulationStep(null);
+        return;
+      }
+
       updateRequestStatus(activePR.id, 'APPROVED', `PO committed to SAP S/4HANA (${generatedPO})`);
 
       setErpSuccessData({
@@ -593,24 +611,60 @@ export const RecommendationView: React.FC = () => {
                 className={`w-full p-4 rounded-xl font-bold text-sm flex items-center justify-between transition-all cursor-pointer shadow-xs ${
                   erpSuccessData
                     ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed'
+                    : isRequisitioner
+                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300'
                     : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white'
                 }`}
               >
                 <div className="flex items-center gap-3 text-left">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${erpSuccessData ? 'bg-slate-200 text-slate-600' : 'bg-emerald-500 text-white'}`}>
-                    <Database className="w-4 h-4" />
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      erpSuccessData
+                        ? 'bg-slate-200 text-slate-600'
+                        : isRequisitioner
+                        ? 'bg-amber-200 text-amber-900'
+                        : 'bg-emerald-500 text-white'
+                    }`}
+                  >
+                    {isRequisitioner && !erpSuccessData ? (
+                      <Lock className="w-4 h-4 text-amber-800" />
+                    ) : (
+                      <Database className="w-4 h-4" />
+                    )}
                   </div>
                   <div>
                     <span className="block leading-tight">
-                      {erpSuccessData ? 'PO Committed to SAP S/4HANA' : 'Approve & Send to ERP'}
+                      {erpSuccessData
+                        ? 'PO Committed to SAP S/4HANA'
+                        : isRequisitioner
+                        ? 'Manager Approval Required (Requisitioner Role)'
+                        : 'Approve & Send to ERP'}
                     </span>
-                    <span className={`text-xs block mt-0.5 font-normal ${erpSuccessData ? 'text-slate-400' : 'text-emerald-100'}`}>
-                      {erpSuccessData ? `Created reference: ${erpSuccessData.poNumber}` : 'Simulate ERP execution & release Purchase Order'}
+                    <span
+                      className={`text-xs block mt-0.5 font-normal ${
+                        erpSuccessData
+                          ? 'text-slate-400'
+                          : isRequisitioner
+                          ? 'text-amber-800'
+                          : 'text-emerald-100'
+                      }`}
+                    >
+                      {erpSuccessData
+                        ? `Created reference: ${erpSuccessData.poNumber}`
+                        : isRequisitioner
+                        ? 'Switch to Sarah Chen (Purchase Manager) to release PO'
+                        : 'Simulate ERP execution & release Purchase Order'}
                     </span>
                   </div>
                 </div>
 
-                <ArrowRight className="w-4 h-4 shrink-0" />
+                {isRequisitioner && !erpSuccessData ? (
+                  <span className="text-[10px] font-mono font-bold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded">
+                    RBAC GATE
+                  </span>
+                ) : (
+                  <ArrowRight className="w-4 h-4 shrink-0" />
+                )}
               </button>
 
               {/* 2. Secondary Action: Save for Later */}

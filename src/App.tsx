@@ -13,6 +13,7 @@ import { RecommendationView } from './views/RecommendationView';
 import { RequestsView } from './views/RequestsView';
 import { AnalyticsView } from './views/AnalyticsView';
 import { SettingsView } from './views/SettingsView';
+import { HistoricalDataView } from './views/HistoricalDataView';
 import { motion, AnimatePresence } from 'motion/react';
 
 const AppContent: React.FC = () => {
@@ -40,6 +41,8 @@ const AppContent: React.FC = () => {
         return <AnalyticsView />;
       case '/settings':
         return <SettingsView />;
+      case '/historical-data':
+        return <HistoricalDataView />;
       default:
         return <DashboardView />;
     }

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useProcure } from '../context/ProcurementContext';
 import { useAuth } from '../context/AuthContext';
-import { CURRENT_USER, ALTERNATE_USER } from '../data/mockProcurementData';
+import { CURRENT_USER, ALTERNATE_USER, ADMIN_USER } from '../data/mockProcurementData';
+import { EnterpriseRole, UserProfile } from '../types/procurement';
 import {
   Hexagon,
   ShieldCheck,
@@ -14,6 +15,8 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
+  UserCheck,
+  ShieldAlert,
 } from 'lucide-react';
 
 type AuthMode = 'signin' | 'signup';
@@ -33,6 +36,7 @@ export const LoginView: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [selectedRole, setSelectedRole] = useState<EnterpriseRole>('REQUISITIONER');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -47,8 +51,12 @@ export const LoginView: React.FC = () => {
       addToast('Welcome to AutoProcure AI', 'Successfully authenticated with Google', 'success');
       navigateTo('/dashboard');
     } catch (err: any) {
-      console.error('Google Sign-In failed:', err);
-      setLocalError(err.message || 'Unable to sign in with Google. Please use Email & Password below.');
+      const msg = err?.message || '';
+      if (msg.includes('popup-blocked') || msg.includes('popup')) {
+        setLocalError('Google Sign-In popup was blocked by the browser or iframe. Open app in a new browser tab for Google Auth, or use the 1-click Role Sandbox below.');
+      } else {
+        setLocalError(msg || 'Unable to sign in with Google. Please use Email & Password or the Role Sandbox below.');
+      }
     } finally {
       setIsGoogleLoading(false);
     }
@@ -77,7 +85,7 @@ export const LoginView: React.FC = () => {
       clearAuthError();
 
       if (authMode === 'signup') {
-        await signUpWithEmail(email, password, displayName);
+        await signUpWithEmail(email, password, displayName, selectedRole);
         addToast('Account Created', `Welcome to AutoProcure AI, ${displayName}!`, 'success');
       } else {
         await signInWithEmail(email, password);
@@ -86,17 +94,21 @@ export const LoginView: React.FC = () => {
 
       navigateTo('/dashboard');
     } catch (err: any) {
-      console.error('Email auth failed:', err);
-      setLocalError(err.message || 'Authentication failed. Please verify your credentials.');
+      const msg = err?.message || '';
+      if (msg.includes('operation-not-allowed')) {
+        setLocalError('Email/Password provider is not currently toggled on in the Firebase project console. Please use the 1-click Role Sandbox below to immediately access the application with full capabilities.');
+      } else {
+        setLocalError(msg || 'Authentication failed. Please verify your credentials.');
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDemoSignIn = (persona: typeof CURRENT_USER) => {
+  const handleDemoSignIn = (persona: UserProfile) => {
     signInWithDemo(persona);
     switchUser(persona);
-    addToast('Authenticated (Demo)', `Logged in as ${persona.name}`, 'info');
+    addToast('Authenticated (Sandbox)', `Logged in as ${persona.name} (${persona.role})`, 'info');
     navigateTo('/dashboard');
   };
 
@@ -108,146 +120,130 @@ export const LoginView: React.FC = () => {
       <div className="flex-1 bg-[#0A0F1D] text-white p-8 md:p-14 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800">
         <div>
           {/* Top Bar */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-xs border border-indigo-500/40">
-                <Hexagon className="w-5 h-5 fill-white/15 stroke-[2]" />
-              </div>
-              <div>
-                <span className="font-bold text-base tracking-tight text-white">AutoProcure AI</span>
-                <span className="text-[10px] ml-2 font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 px-1.5 py-0.2 rounded">
-                  ENTERPRISE
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white shadow-md border border-indigo-400/30">
+              <Hexagon className="w-5 h-5 fill-white/20 stroke-[2]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white tracking-tight text-base">
+                  AutoProcure AI
+                </span>
+                <span className="text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 px-1.5 py-0.5 rounded">
+                  v2.4
                 </span>
               </div>
-            </div>
-            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span>Point-of-Origin Gatekeeper</span>
+              <span className="text-xs text-slate-400 font-medium">
+                Enterprise Pre-Submission Gatekeeper
+              </span>
             </div>
           </div>
 
-          {/* Hero Content */}
-          <div className="mt-12 md:mt-16 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold tracking-wide mb-5">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span>AutoProcure AI</span>
+          {/* Value Proposition */}
+          <div className="max-w-md space-y-4">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-950/80 border border-indigo-700/50 text-indigo-300 text-xs font-mono">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Role-Based Access Control (RBAC)</span>
             </div>
 
-            <h1 className="text-2xl md:text-4xl font-bold tracking-tight leading-tight text-white">
-              AI-Powered Purchase Request Checking System
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+              AI-Powered Autonomous Verification for Enterprise Procurement.
             </h1>
 
-            <p className="mt-4 text-sm md:text-base text-slate-300 leading-relaxed font-normal">
-              Clean data. Check budgets. Optimize inventory. Make smarter procurement decisions.
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Enforcing strict segregation of duties across Requisitioners, Purchase Managers, and Administrators before ERP commitment.
             </p>
 
-            {/* Feature Highlights - 4 Gates */}
-            <div className="mt-8">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block mb-3">
-                Pre-Submission Verification Pipeline
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 text-left">
-                  <span className="text-indigo-400 text-[10px] font-mono font-bold block mb-0.5">GATE 01</span>
-                  <span className="text-xs font-semibold text-slate-200">Data Cleaning</span>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 text-left">
-                  <span className="text-indigo-400 text-[10px] font-mono font-bold block mb-0.5">GATE 02</span>
-                  <span className="text-xs font-semibold text-slate-200">Budget Check</span>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 text-left">
-                  <span className="text-indigo-400 text-[10px] font-mono font-bold block mb-0.5">GATE 03</span>
-                  <span className="text-xs font-semibold text-slate-200">Inventory Check</span>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 text-left">
-                  <span className="text-indigo-400 text-[10px] font-mono font-bold block mb-0.5">GATE 04</span>
-                  <span className="text-xs font-semibold text-slate-200">Usage Analysis</span>
+            {/* Feature Badges */}
+            <div className="pt-3 space-y-2.5">
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <strong className="text-white font-semibold">4-Gate Deterministic Engine:</strong>{' '}
+                  <span className="text-slate-400">
+                    Clean, Budget Check, Sister-Site Stock, Usage Validation
+                  </span>
                 </div>
               </div>
-            </div>
-
-            {/* Value checklist */}
-            <div className="mt-8 space-y-2 text-xs text-slate-300">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Standardizes unstructured item descriptions into ERP-compliant catalog items</span>
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <strong className="text-white font-semibold">Segregation of Duties:</strong>{' '}
+                  <span className="text-slate-400">
+                    Requisitioners cannot self-approve; manager approval authority enforced
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Prevents duplicate purchasing by uncovering idle surplus in sister facilities</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Direct BAPI_PO_CREATE1 integration with SAP S/4HANA workflows</span>
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <strong className="text-white font-semibold">Audit Ledger:</strong>{' '}
+                  <span className="text-slate-400">
+                    Immutable persistent audit logging for regulatory compliance
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Footer Note */}
-        <div className="mt-10 text-xs text-slate-400 flex flex-col sm:flex-row sm:items-center justify-between border-t border-slate-800/80 pt-5 gap-2">
+        {/* Bottom Footer Note */}
+        <div className="pt-8 mt-8 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-2">
-            <Lock className="w-3.5 h-3.5 text-slate-400" />
-            <span>Secure enterprise procurement workspace</span>
+            <Lock className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Encrypted with Cloud Firestore Security Rules</span>
           </div>
-          <span className="text-slate-400">SAP S/4HANA Certified Adapter</span>
+          <span className="font-mono text-[11px] text-slate-400">PRD v2.4</span>
         </div>
       </div>
 
       {/* Right Column: Authentication Card */}
-      <div className="flex-1 bg-[#0B1120] flex items-center justify-center p-6 md:p-14">
-        <div className="max-w-md w-full bg-[#111A2E] border border-slate-800 rounded-2xl p-7 md:p-8 shadow-2xl relative overflow-hidden">
-          {/* Subtle glow accent */}
-          <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-
-          {/* Header */}
-          <div className="mb-5">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] font-mono font-semibold uppercase tracking-wider mb-2.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Enterprise Identity</span>
-            </div>
-            <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">
-              {authMode === 'signin' ? 'Sign In to AutoProcure AI' : 'Create Enterprise Account'}
+      <div className="w-full md:w-[460px] bg-[#0E1526] p-6 sm:p-10 flex flex-col justify-center border-l border-slate-800">
+        <div className="w-full max-w-sm mx-auto">
+          {/* Card Title & Mode Toggle */}
+          <div className="mb-6">
+            <h2 className="text-lg font-bold text-white tracking-tight mb-1">
+              {authMode === 'signin' ? 'Sign In to Workspace' : 'Create Enterprise Account'}
             </h2>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+            <p className="text-xs text-slate-400">
               {authMode === 'signin'
-                ? 'Authenticate to access the pre-submission gatekeeper system.'
-                : 'Register a new authorized procurement profile.'}
+                ? 'Authenticate with your corporate identity'
+                : 'Register your enterprise procurement profile'}
             </p>
-          </div>
 
-          {/* Mode Switcher Tabs */}
-          <div className="flex rounded-xl bg-slate-900/80 p-1 border border-slate-800 mb-5">
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode('signin');
-                setLocalError(null);
-                clearAuthError();
-              }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                authMode === 'signin'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode('signup');
-                setLocalError(null);
-                clearAuthError();
-              }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                authMode === 'signup'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Create Account
-            </button>
+            {/* Mode Switch Tabs */}
+            <div className="grid grid-cols-2 p-1 bg-slate-900/90 rounded-xl border border-slate-800 mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('signin');
+                  setLocalError(null);
+                  clearAuthError();
+                }}
+                className={`py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  authMode === 'signin'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('signup');
+                  setLocalError(null);
+                  clearAuthError();
+                }}
+                className={`py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  authMode === 'signup'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Register
+              </button>
+            </div>
           </div>
 
           {/* Error Banner */}
@@ -308,8 +304,8 @@ export const LoginView: React.FC = () => {
               <div className="w-full border-t border-slate-800" />
             </div>
             <div className="relative flex justify-center text-[10px] uppercase font-mono tracking-wider">
-              <span className="bg-[#111A2E] px-2.5 text-slate-500">
-                Or with Email & Password
+              <span className="bg-[#0E1526] px-2.5 text-slate-500">
+                Or with Corporate Email
               </span>
             </div>
           </div>
@@ -383,67 +379,93 @@ export const LoginView: React.FC = () => {
               </div>
             </div>
 
-            {authMode === 'signin' && (
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    className="rounded border-slate-700 accent-indigo-600 cursor-pointer"
-                  />
-                  <span>Remember session</span>
+            {/* Role selection on sign up */}
+            {authMode === 'signup' && (
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Requested Security Clearance
                 </label>
-                <span className="text-slate-500">Firebase Auth</span>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as EnterpriseRole)}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700/80 rounded-lg text-white text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+                >
+                  <option value="REQUISITIONER">Requisitioner (Create & Track PRs)</option>
+                  <option value="PURCHASE_MANAGER">Purchase Manager (Review & Approval Authority)</option>
+                  <option value="ADMIN">Governance Administrator (System Administration)</option>
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Enforces Firestore security rules based on role assignments.
+                </p>
               </div>
             )}
 
             <button
               type="submit"
               disabled={isSubmitting || isGoogleLoading}
-              className="w-full mt-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed border border-indigo-500"
+              className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed border border-indigo-500"
             >
               {isSubmitting ? (
                 <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>{authMode === 'signin' ? 'Sign In to Gatekeeper' : 'Create Enterprise Account'}</span>
+                  <span>
+                    {authMode === 'signin'
+                      ? 'Sign In to Gatekeeper'
+                      : 'Create Enterprise Account'}
+                  </span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Privacy and Security Indicator */}
-          <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 pt-3">
-            <Lock className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Secure enterprise procurement workspace</span>
-          </div>
-
-          {/* Role Simulation Sandbox (preserves all demo scenarios) */}
+          {/* Role Simulation Sandbox (3 Personas) */}
           <div className="mt-5 pt-3.5 border-t border-slate-800">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2 text-center">
-              One-Click Role Simulation
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoSignIn(CURRENT_USER)}
-                className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/80 hover:bg-slate-850 text-left transition-all cursor-pointer group shadow-2xs"
-              >
-                <div className="font-semibold text-[11px] text-white group-hover:text-indigo-300 transition-colors">
-                  Fawad Ali Shan
-                </div>
-                <div className="text-[9px] text-slate-400">Procurement Director</div>
-              </button>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Development Role Sandbox
+              </span>
+              <span className="text-[9px] font-mono text-indigo-400 bg-indigo-950/60 px-1.5 py-0.2 rounded border border-indigo-800/60">
+                3 ROLES
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
               <button
                 type="button"
                 onClick={() => handleDemoSignIn(ALTERNATE_USER)}
-                className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/80 hover:bg-slate-850 text-left transition-all cursor-pointer group shadow-2xs"
+                className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/80 hover:bg-slate-850 text-left transition-all cursor-pointer group shadow-2xs"
               >
-                <div className="font-semibold text-[11px] text-white group-hover:text-indigo-300 transition-colors">
+                <div className="font-semibold text-[10px] text-white group-hover:text-emerald-300 transition-colors truncate">
                   Marcus Vance
                 </div>
-                <div className="text-[9px] text-slate-400">Requisitioner (Ops)</div>
+                <div className="text-[8px] font-mono text-emerald-400 font-bold uppercase">
+                  Requisitioner
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoSignIn(CURRENT_USER)}
+                className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/80 hover:bg-slate-850 text-left transition-all cursor-pointer group shadow-2xs"
+              >
+                <div className="font-semibold text-[10px] text-white group-hover:text-amber-300 transition-colors truncate">
+                  Fawad Ali Shan
+                </div>
+                <div className="text-[8px] font-mono text-amber-400 font-bold uppercase">
+                  Manager
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoSignIn(ADMIN_USER)}
+                className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-rose-500/80 hover:bg-slate-850 text-left transition-all cursor-pointer group shadow-2xs"
+              >
+                <div className="font-semibold text-[10px] text-white group-hover:text-rose-300 transition-colors truncate">
+                  Sarah Chen
+                </div>
+                <div className="text-[8px] font-mono text-rose-400 font-bold uppercase">
+                  Admin
+                </div>
               </button>
             </div>
           </div>

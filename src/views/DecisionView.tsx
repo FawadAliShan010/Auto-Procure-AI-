@@ -136,7 +136,10 @@ export const DecisionView: React.FC = () => {
         : 'Expedited with priority routing';
 
     const note = `${actionText} by ${currentUser.name} (${currentUser.role})`;
-    updateRequestStatus(targetId, newStatus, note);
+    const updated = updateRequestStatus(targetId, newStatus, note);
+    if (!updated) {
+      return;
+    }
 
     const recorded = {
       type,

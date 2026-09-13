@@ -8,13 +8,45 @@ export type RoutePath =
   | '/recommendation'
   | '/requests'
   | '/analytics'
-  | '/settings';
+  | '/settings'
+  | '/historical-data';
+
+export type EnterpriseRole = 'REQUISITIONER' | 'PURCHASE_MANAGER' | 'ADMIN';
 
 export type UserRole =
+  | EnterpriseRole
   | 'Procurement Director'
   | 'Procurement Team'
   | 'Department Requisitioner'
   | 'Operations Lead';
+
+export const normalizeRole = (role?: string): EnterpriseRole => {
+  if (!role) return 'REQUISITIONER';
+  const upper = role.toUpperCase();
+  if (upper === 'ADMIN' || upper.includes('ADMINISTRATOR')) return 'ADMIN';
+  if (
+    upper === 'PURCHASE_MANAGER' ||
+    upper.includes('DIRECTOR') ||
+    upper.includes('PROCUREMENT') ||
+    upper.includes('MANAGER')
+  ) {
+    return 'PURCHASE_MANAGER';
+  }
+  return 'REQUISITIONER';
+};
+
+export const isRequisitionerRole = (role?: string): boolean => {
+  return normalizeRole(role) === 'REQUISITIONER';
+};
+
+export const isPurchaseManagerRole = (role?: string): boolean => {
+  const norm = normalizeRole(role);
+  return norm === 'PURCHASE_MANAGER' || norm === 'ADMIN';
+};
+
+export const isAdminRole = (role?: string): boolean => {
+  return normalizeRole(role) === 'ADMIN';
+};
 
 export interface UserProfile {
   id: string;
@@ -23,6 +55,7 @@ export interface UserProfile {
   role: UserRole;
   department: string;
   avatarUrl?: string;
+  profilePicturePath?: string;
 }
 
 export type Department =
@@ -39,7 +72,7 @@ export type GateStatus = 'PASSED' | 'WARNING' | 'FAILED' | 'FOUND' | 'HIGH' | 'O
 
 export type DecisionType = 'APPROVE' | 'PROCEED' | 'REDUCE' | 'HOLD' | 'INVESTIGATE' | 'EXPEDITE' | 'REJECT' | 'REJECTED';
 
-export type PRStatus = 'DRAFT' | 'PENDING_VALIDATION' | 'APPROVED' | 'REDUCE' | 'ON_HOLD' | 'INVESTIGATE' | 'EXPEDITED' | 'REJECTED';
+export type PRStatus = 'DRAFT' | 'PENDING_VALIDATION' | 'AUDITED' | 'APPROVED' | 'REDUCE' | 'ON_HOLD' | 'INVESTIGATE' | 'EXPEDITED' | 'REJECTED';
 
 export interface Gate1Result {
   originalInput: string;
