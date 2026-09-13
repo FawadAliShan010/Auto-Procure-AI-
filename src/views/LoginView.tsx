@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useProcure } from '../context/ProcurementContext';
 import { useAuth } from '../context/AuthContext';
-import { CURRENT_USER, ALTERNATE_USER, ADMIN_USER } from '../data/mockProcurementData';
+import { CURRENT_USER, ALTERNATE_USER } from '../data/mockProcurementData';
 import { EnterpriseRole, UserProfile } from '../types/procurement';
 import {
   Hexagon,
@@ -420,51 +420,39 @@ export const LoginView: React.FC = () => {
             </button>
           </form>
 
-          {/* Role Simulation Sandbox (3 Personas) */}
+          {/* Role Simulation Sandbox (Requisitioner & Manager Personas) */}
           <div className="mt-5 pt-3.5 border-t border-slate-800">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Development Role Sandbox
               </span>
               <span className="text-[9px] font-mono text-indigo-400 bg-indigo-950/60 px-1.5 py-0.2 rounded border border-indigo-800/60">
-                3 ROLES
+                2 ROLES
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => handleDemoSignIn(ALTERNATE_USER)}
-                className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/80 hover:bg-slate-850 text-left transition-all cursor-pointer group shadow-2xs"
+                className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/80 hover:bg-slate-850 text-left transition-all cursor-pointer group shadow-2xs"
               >
-                <div className="font-semibold text-[10px] text-white group-hover:text-emerald-300 transition-colors truncate">
+                <div className="font-semibold text-[11px] text-white group-hover:text-emerald-300 transition-colors truncate">
                   Marcus Vance
                 </div>
-                <div className="text-[8px] font-mono text-emerald-400 font-bold uppercase">
+                <div className="text-[9px] font-mono text-emerald-400 font-bold uppercase">
                   Requisitioner
                 </div>
               </button>
               <button
                 type="button"
                 onClick={() => handleDemoSignIn(CURRENT_USER)}
-                className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/80 hover:bg-slate-850 text-left transition-all cursor-pointer group shadow-2xs"
+                className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/80 hover:bg-slate-850 text-left transition-all cursor-pointer group shadow-2xs"
               >
-                <div className="font-semibold text-[10px] text-white group-hover:text-amber-300 transition-colors truncate">
+                <div className="font-semibold text-[11px] text-white group-hover:text-amber-300 transition-colors truncate">
                   Fawad Ali Shan
                 </div>
-                <div className="text-[8px] font-mono text-amber-400 font-bold uppercase">
+                <div className="text-[9px] font-mono text-amber-400 font-bold uppercase">
                   Manager
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoSignIn(ADMIN_USER)}
-                className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-rose-500/80 hover:bg-slate-850 text-left transition-all cursor-pointer group shadow-2xs"
-              >
-                <div className="font-semibold text-[10px] text-white group-hover:text-rose-300 transition-colors truncate">
-                  Sarah Chen
-                </div>
-                <div className="text-[8px] font-mono text-rose-400 font-bold uppercase">
-                  Admin
                 </div>
               </button>
             </div>
