@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useProcure } from '../context/ProcurementContext';
-import { Department, PurchaseRequest } from '../types/procurement';
+import { Department, PurchaseRequest, isRequisitionerRole } from '../types/procurement';
 import { Button } from '../components/common/Button';
+import * as XLSX from 'xlsx';
 import {
   Sparkles,
   ArrowRight,
@@ -16,6 +17,8 @@ import {
   DollarSign,
   Layers,
   ShieldCheck,
+  FileSpreadsheet,
+  Upload,
 } from 'lucide-react';
 
 interface FormErrors {
@@ -28,10 +31,10 @@ interface FormErrors {
 }
 
 export const SubmitPRView: React.FC = () => {
-  const { activeDraft, updateDraft, startAnalysisFlow, addToast } = useProcure();
+  const { activeDraft, updateDraft, startAnalysisFlow, addToast, currentUser } = useProcure();
 
   // Form local state initialized from active draft or defaults
-  const [employeeName, setEmployeeName] = useState<string>(activeDraft.employeeName || 'Fawad Ali Shan');
+  const [employeeName, setEmployeeName] = useState<string>(activeDraft.employeeName || currentUser?.name || 'Fawad Ali Shan');
   const [department, setDepartment] = useState<Department>((activeDraft.department as Department) || 'IT / Technology');
   const [itemDescription, setItemDescription] = useState<string>(activeDraft.itemDescription || '');
   const [quantity, setQuantity] = useState<number | string>(activeDraft.quantity ?? 10);
@@ -245,12 +248,105 @@ export const SubmitPRView: React.FC = () => {
     startAnalysisFlow(draftData);
   };
 
+  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        if (!jsonData || jsonData.length === 0) {
+          addToast('Excel Error', 'The uploaded Excel file contains no data rows.', 'error');
+          return;
+        }
+
+        const row = jsonData[0];
+        const itemDesc = row.itemDescription || row.description || row.ItemDescription || row.Description || row.Item || row.item;
+        const qty = row.quantity || row.qty || row.Quantity || row.Qty;
+        const price = row.estimatedPrice || row.price || row.unitPrice || row.EstimatedPrice || row.Price || row.UnitPrice || 0;
+        const dept = row.department || row.dept || row.Department || row.Dept || department;
+        const reqDate = row.requiredDate || row.date || row.RequiredDate || row.Date || requiredDate;
+        const notes = row.additionalNotes || row.notes || row.AdditionalNotes || row.Notes || '';
+
+        if (!itemDesc || qty === undefined || qty === null) {
+          addToast('Validation Error', 'Excel file is missing required columns (e.g. itemDescription, quantity).', 'error');
+          return;
+        }
+
+        const parsedName = currentUser?.name || 'Requisitioner';
+        const draftData: Partial<PurchaseRequest> = {
+          employeeName: parsedName,
+          department: (dept as Department) || 'IT / Technology',
+          itemDescription: String(itemDesc),
+          quantity: Number(qty) || 1,
+          estimatedPrice: Number(price) || 0,
+          requiredDate: reqDate ? String(reqDate) : new Date(Date.now() + 86400000 * 14).toISOString().split('T')[0],
+          additionalNotes: String(notes),
+        };
+
+        addToast(
+          'Excel Requisition Submitted',
+          `Successfully processed Excel data for "${itemDesc}" (Qty: ${qty}). Running AI Audit...`,
+          'success'
+        );
+
+        startAnalysisFlow(draftData);
+      } catch (err: any) {
+        addToast('Excel Parse Failed', err?.message || 'Invalid Excel format or structure.', 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
+
   const numQuantity = Number(quantity) || 0;
   const numPrice = Number(estimatedPrice) || 0;
   const grossCommitment = numQuantity * numPrice;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {/* Requisitioner Exclusive Excel Submission Workflow */}
+      {isRequisitionerRole(currentUser?.role) && (
+        <div className="bg-white rounded-xl border border-emerald-200 p-5 shadow-2xs relative overflow-hidden">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-mono font-bold uppercase tracking-wider">
+                  <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
+                  Requisitioner Portal
+                </span>
+                <span className="text-xs text-slate-400 font-mono hidden sm:inline">• Direct Excel Ingestion</span>
+              </div>
+              <h3 className="text-base font-bold text-slate-900">
+                Submit Requisition Excel
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed max-w-xl">
+                Upload your item requisition spreadsheet (.xlsx, .xls, .csv). AutoProcure AI will instantly validate columns, parse records, and run the 4-gate audit workflow for your submission.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-sm transition-all">
+                <Upload className="w-4 h-4" />
+                <span>Choose Excel File</span>
+                <input
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  className="hidden"
+                  onChange={handleExcelUpload}
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. Dedicated Demo Scenario Launchpad Banner */}
       <div className="bg-white rounded-xl border border-indigo-100 p-4 sm:p-5 shadow-2xs relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
