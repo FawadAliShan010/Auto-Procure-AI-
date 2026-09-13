@@ -25,6 +25,7 @@ import {
   ItemMasterDoc,
   HistoricalTransactionDoc,
   UploadedFileMetadataDoc,
+  ImportBatchDoc,
   ManagerDecisionDoc,
   AuditLogDoc,
   RequisitionStatus,
@@ -40,6 +41,7 @@ const DEMO_STORAGE_PREFIX = 'autoprocure_demo_db_';
 
 function saveLocal<T>(coll: string, id: string, docData: T): void {
   try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
     const key = `${DEMO_STORAGE_PREFIX}${coll}`;
     const raw = localStorage.getItem(key);
     const map = raw ? JSON.parse(raw) : {};
@@ -52,6 +54,7 @@ function saveLocal<T>(coll: string, id: string, docData: T): void {
 
 function getLocal<T>(coll: string, id: string): T | null {
   try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
     const key = `${DEMO_STORAGE_PREFIX}${coll}`;
     const raw = localStorage.getItem(key);
     if (!raw) return null;
@@ -64,6 +67,7 @@ function getLocal<T>(coll: string, id: string): T | null {
 
 function listLocal<T>(coll: string): T[] {
   try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return [];
     const key = `${DEMO_STORAGE_PREFIX}${coll}`;
     const raw = localStorage.getItem(key);
     if (!raw) return [];
@@ -378,9 +382,18 @@ export const batchCreateHistoricalTransactions = async (
 };
 
 export const listHistoricalTransactions = async (
-  filter?: { importBatchId?: string; itemId?: string; limit?: number }
+  filter?: {
+    importBatchId?: string;
+    itemId?: string;
+    dataQualityStatus?: string;
+    siteLocation?: string;
+    department?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  }
 ): Promise<HistoricalTransactionDoc[]> => {
-  const maxLimit = filter?.limit || 200;
+  const maxLimit = filter?.limit || 500;
 
   if (!auth.currentUser) {
     let items = listLocal<HistoricalTransactionDoc>('historical_transactions');
@@ -388,9 +401,24 @@ export const listHistoricalTransactions = async (
       items = items.filter((t) => t.importBatchId === filter.importBatchId);
     }
     if (filter?.itemId) {
-      items = items.filter((t) => t.itemId === filter.itemId);
+      items = items.filter((t) => (t.itemId || '').toLowerCase() === filter.itemId!.toLowerCase());
     }
-    return items.slice(0, maxLimit);
+    if (filter?.dataQualityStatus && filter.dataQualityStatus !== 'ALL') {
+      items = items.filter((t) => t.dataQualityStatus === filter.dataQualityStatus);
+    }
+    if (filter?.siteLocation) {
+      items = items.filter((t) => (t.siteLocation || '').toLowerCase().includes(filter.siteLocation!.toLowerCase()));
+    }
+    if (filter?.department) {
+      items = items.filter((t) => (t.department || '').toLowerCase().includes(filter.department!.toLowerCase()));
+    }
+    if (filter?.startDate) {
+      items = items.filter((t) => t.transactionDate >= filter.startDate!);
+    }
+    if (filter?.endDate) {
+      items = items.filter((t) => t.transactionDate <= filter.endDate!);
+    }
+    return items.sort((a, b) => (b.transactionDate > a.transactionDate ? 1 : -1)).slice(0, maxLimit);
   }
 
   const path = 'historical_transactions';
@@ -402,9 +430,27 @@ export const listHistoricalTransactions = async (
     if (filter?.itemId) {
       q = query(q, where('itemId', '==', filter.itemId));
     }
+    if (filter?.dataQualityStatus && filter.dataQualityStatus !== 'ALL') {
+      q = query(q, where('dataQualityStatus', '==', filter.dataQualityStatus));
+    }
     q = query(q, limit(maxLimit));
     const snap = await getDocs(q);
-    return snap.docs.map((d) => d.data() as HistoricalTransactionDoc);
+    let results = snap.docs.map((d) => d.data() as HistoricalTransactionDoc);
+    
+    // In-memory client filters for complex combined conditions
+    if (filter?.siteLocation) {
+      results = results.filter((t) => (t.siteLocation || '').toLowerCase().includes(filter.siteLocation!.toLowerCase()));
+    }
+    if (filter?.department) {
+      results = results.filter((t) => (t.department || '').toLowerCase().includes(filter.department!.toLowerCase()));
+    }
+    if (filter?.startDate) {
+      results = results.filter((t) => t.transactionDate >= filter.startDate!);
+    }
+    if (filter?.endDate) {
+      results = results.filter((t) => t.transactionDate <= filter.endDate!);
+    }
+    return results.sort((a, b) => (b.transactionDate > a.transactionDate ? 1 : -1));
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, path);
   }
@@ -496,6 +542,78 @@ export const updateUploadedFileStatus = async (
 };
 
 // ==========================================
+// 7. IMPORT BATCHES
+// ==========================================
+
+export const createImportBatch = async (batch: ImportBatchDoc): Promise<void> => {
+  saveLocal('import_batches', batch.batchId, batch);
+  if (!auth.currentUser) {
+    return;
+  }
+  const path = `import_batches/${batch.batchId}`;
+  try {
+    await setDoc(doc(db, 'import_batches', batch.batchId), batch);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+};
+
+export const updateImportBatch = async (
+  batchId: string,
+  updateData: Partial<ImportBatchDoc>
+): Promise<void> => {
+  const local = getLocal<ImportBatchDoc>('import_batches', batchId);
+  if (local) {
+    saveLocal('import_batches', batchId, { ...local, ...updateData, updatedAt: new Date().toISOString() });
+  }
+
+  if (!auth.currentUser) {
+    return;
+  }
+  const path = `import_batches/${batchId}`;
+  try {
+    await updateDoc(doc(db, 'import_batches', batchId), {
+      ...updateData,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+};
+
+export const getImportBatch = async (batchId: string): Promise<ImportBatchDoc | null> => {
+  if (!auth.currentUser) {
+    return getLocal<ImportBatchDoc>('import_batches', batchId);
+  }
+  const path = `import_batches/${batchId}`;
+  try {
+    const snap = await getDoc(doc(db, 'import_batches', batchId));
+    return snap.exists() ? (snap.data() as ImportBatchDoc) : getLocal<ImportBatchDoc>('import_batches', batchId);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+  }
+};
+
+export const listImportBatches = async (
+  limitCount: number = 50
+): Promise<ImportBatchDoc[]> => {
+  if (!auth.currentUser) {
+    const list = listLocal<ImportBatchDoc>('import_batches');
+    return list.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()).slice(0, limitCount);
+  }
+
+  const path = 'import_batches';
+  try {
+    const q = query(collection(db, 'import_batches'), limit(limitCount));
+    const snap = await getDocs(q);
+    const batches = snap.docs.map((d) => d.data() as ImportBatchDoc);
+    return batches.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+  }
+};
+
+// ==========================================
 // 8. PURCHASE MANAGER DECISIONS
 // ==========================================
 
@@ -562,6 +680,45 @@ export const logAuditEvent = async (
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
+};
+
+export const recordAuditLog = logAuditEvent;
+
+export const createManagerDecisionDoc = (params: {
+  requisitionId: string;
+  lineItemId?: string;
+  managerId: string;
+  managerName?: string;
+  managerEmail?: string;
+  decision: any;
+  originalQuantity: number;
+  approvedQuantity: number;
+  transferQuantity?: number;
+  justification: string;
+  overrideAiReason?: string;
+  savingsEstimated?: number;
+  aiRecommendation?: string;
+}): ManagerDecisionDoc => {
+  const now = new Date().toISOString();
+  return {
+    id: `DEC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    requisitionId: params.requisitionId,
+    lineItemId: params.lineItemId,
+    managerId: params.managerId,
+    managerName: params.managerName,
+    managerEmail: params.managerEmail,
+    decision: params.decision,
+    originalQuantity: params.originalQuantity,
+    approvedQuantity: params.approvedQuantity,
+    transferQuantity: params.transferQuantity,
+    justification: params.justification,
+    overrideAiReason: params.overrideAiReason,
+    savingsEstimated: params.savingsEstimated,
+    aiRecommendation: params.aiRecommendation,
+    createdAt: now,
+    timestamp: now,
+    decisionTimestamp: now,
+  };
 };
 
 export const getAuditHistory = async (

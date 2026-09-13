@@ -26,8 +26,9 @@ export const db = getFirestore(app, config.firestoreDatabaseId);
 // Initialize Firebase Cloud Storage
 export const storage = getStorage(app);
 
-// Test connection to Firestore on initialization
+// Test connection to Firestore on initialization in browser context
 async function testFirestoreConnection() {
+  if (typeof window === 'undefined') return;
   try {
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Connection check timeout')), 2500)
@@ -40,7 +41,9 @@ async function testFirestoreConnection() {
     // Client operates in local offline or connected mode smoothly
   }
 }
-testFirestoreConnection();
+if (typeof window !== 'undefined') {
+  testFirestoreConnection();
+}
 
 // Structured Firestore Error Handling according to skill specification
 export enum OperationType {

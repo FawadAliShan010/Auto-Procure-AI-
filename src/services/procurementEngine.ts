@@ -13,6 +13,13 @@ import {
   MasterCatalogItem,
 } from '../data/mockProcurementData';
 import { evaluateProcurementDecision } from './decisionEngine';
+import {
+  matchItemIdentity,
+  calculateHistoricalMetrics,
+  synthesizeRecommendation,
+  analyzeLineItemHistory,
+} from './historicalAnalysisEngine';
+import { HistoricalTransactionDoc, ItemMasterDoc } from '../types/procurementDataModel';
 
 export function analyzePurchaseRequest(input: Partial<PurchaseRequest>): {
   gate1: Gate1Result;
@@ -126,21 +133,77 @@ export function analyzePurchaseRequest(input: Partial<PurchaseRequest>): {
     transferRecommendation,
   };
 
-  // 4. GATE 4: Usage Analysis (Preceding 90-Day Baseline)
-  const avgMonthlyUsage = matchedItem.avgMonthlyConsumption;
+  // 4. GATE 4: Upgraded Historical Consumption & Requirement Analysis Engine (Stage 1 & Stage 2)
+  const avgMonthlyUsage = matchedItem.avgMonthlyConsumption || 10;
   const monthsOfSupply = Number((quantity / Math.max(1, avgMonthlyUsage)).toFixed(1));
+
+  // Synthesize 24-month historical metrics based on item's monthly velocity
+  const baselineTxs: HistoricalTransactionDoc[] = [];
+  const now = new Date();
+  for (let i = 23; i >= 0; i--) {
+    const txDate = new Date(now.getFullYear(), now.getMonth() - i, 15);
+    const dateIso = txDate.toISOString().split('T')[0];
+    const isRecent = i < 3;
+    const monthlyVariance = 0.85 + ((i * 7) % 30) / 100;
+    const pQty = Math.round(avgMonthlyUsage * monthlyVariance);
+    const cQty = Math.round(avgMonthlyUsage * monthlyVariance * 0.95);
+
+    baselineTxs.push({
+      transactionId: `TX-HIST-${matchedItem.sku}-${i}`,
+      importBatchId: 'BATCH-INITIAL-DATA',
+      originalFileId: 'FILE-SYSTEM-MASTER',
+      rowIndex: i + 1,
+      transactionDate: dateIso,
+      itemId: matchedItem.sku.replace('#', ''),
+      rawItemDescription: rawText || matchedItem.officialTitle,
+      standardizedItemDescription: matchedItem.officialTitle,
+      quantityPurchased: pQty,
+      quantityConsumed: cQty,
+      unit: 'EA',
+      siteLocation: 'Plant-A Regional Depot',
+      department: dept,
+      dataQualityStatus: 'VALID',
+      createdAt: dateIso,
+    });
+  }
+
+  const histMetrics = calculateHistoricalMetrics(baselineTxs, quantity, 24);
+  const catalogItem: ItemMasterDoc = {
+    itemId: matchedItem.sku.replace('#', ''),
+    officialSku: matchedItem.sku.replace('#', ''),
+    standardizedDescription: matchedItem.officialTitle,
+    unspscCategory: matchedItem.category,
+    glCode: matchedItem.glCode,
+    avgMonthlyConsumption: matchedItem.avgMonthlyConsumption,
+    active: true,
+    aliases: [matchedItem.officialTitle.toLowerCase(), rawText.toLowerCase()],
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  };
+
+  const itemMatch = matchItemIdentity(
+    {
+      sku: matchedItem.sku.replace('#', ''),
+      rawDescription: rawText,
+      standardizedDescription: matchedItem.officialTitle,
+    },
+    [catalogItem]
+  );
+
+  const rec = synthesizeRecommendation(itemMatch, histMetrics, quantity);
+
   let gate4Status: 'Optimal' | 'High' | 'Low' = 'Optimal';
   let usageMsg = `Normal run-rate (~${monthsOfSupply} months of supply)`;
 
-  if (monthsOfSupply >= 3) {
+  if (rec.status === 'POTENTIAL_EXCESS') {
     gate4Status = 'High';
-    usageMsg = `Requested quantity covers ${monthsOfSupply} months of supply based on 90-day average usage (${avgMonthlyUsage} units/mo)`;
-  } else if (monthsOfSupply < 0.5) {
+    usageMsg = `Requested volume (${quantity}) represents ~${monthsOfSupply} months of supply (${avgMonthlyUsage} units/mo baseline)`;
+  } else if (rec.status === 'POTENTIAL_SHORTFALL') {
     gate4Status = 'Low';
     usageMsg = 'Below typical minimum maintenance safety buffer';
   }
 
-  // Recommended external quantity is requested quantity minus any transferred idle units, capped to healthy buffer
+  // Recommended external quantity is requested quantity minus any transferred idle units
   const recommendedQuantity = Math.max(0, quantity - recommendedTransferQuantity);
 
   const gate4: Gate4Result = {
@@ -155,10 +218,28 @@ export function analyzePurchaseRequest(input: Partial<PurchaseRequest>): {
       { month: 'Jul', usage: Math.round(avgMonthlyUsage * 0.9) },
       { month: 'Aug', usage: Math.round(avgMonthlyUsage * 1.0) },
     ],
+    // Rich historical metrics
+    availablePeriodLabel: histMetrics.availablePeriodLabel,
+    annualizedConsumption: histMetrics.annualizedConsumption,
+    totalPurchasedQuantity: histMetrics.totalPurchasedQuantity,
+    totalConsumedQuantity: histMetrics.totalConsumedQuantity,
+    quantityVariance: histMetrics.quantityVariance,
+    percentageVariance: histMetrics.percentageVariance,
+    consumptionTrend: histMetrics.consumptionTrend,
+    recommendationStatus: rec.status,
+    recommendationStatusLabel: rec.statusLabel,
+    keyEvidence: rec.keyEvidence,
+    suggestedAction: rec.suggestedAction,
+    isExcessFlagged: rec.isExcessFlagged,
+    dataQualityWarning: histMetrics.dataQualityWarning,
+    historicalAnalysis: {
+      metrics: histMetrics,
+      recommendation: rec,
+      itemMatching: itemMatch,
+    },
   };
 
   // 5. DECISION SYNTHESIS & RECOMMENDATION
-  // Uses the central deterministic procurement decision engine
   const engineResult = evaluateProcurementDecision({
     standardizedItem: gate1.standardized,
     itemCode: gate1.matchedItemCode,

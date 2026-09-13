@@ -22,6 +22,9 @@ import {
   Sparkles,
   Info,
   Check,
+  BarChart3,
+  Package,
+  ShieldAlert,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -41,11 +44,20 @@ import {
 import {
   listUploadedFiles,
   listHistoricalTransactions,
+  listImportBatches,
 } from '../services/persistentDataService';
 import {
   UploadedFileMetadataDoc,
   HistoricalTransactionDoc,
+  ImportBatchDoc,
 } from '../types/procurementDataModel';
+import { HistoricalSummaryCards } from '../components/historical/HistoricalSummaryCards';
+import { ImportBatchesView } from '../components/historical/ImportBatchesView';
+import { HistoricalExplorerView } from '../components/historical/HistoricalExplorerView';
+import { ItemLevelSummaryView } from '../components/historical/ItemLevelSummaryView';
+import { DataQualityHubView } from '../components/historical/DataQualityHubView';
+import { BatchDetailModal } from '../components/historical/BatchDetailModal';
+import { TransactionDetailModal } from '../components/historical/TransactionDetailModal';
 
 export const HistoricalDataView: React.FC = () => {
   const { currentUser, addToast } = useProcure();
@@ -53,7 +65,9 @@ export const HistoricalDataView: React.FC = () => {
   const isAuthorized = isPurchaseManagerRole(currentUser.role);
 
   // Active View Tab
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'files' | 'transactions' | 'verification'>('pipeline');
+  const [activeTab, setActiveTab] = useState<
+    'pipeline' | 'batches' | 'explorer' | 'items' | 'quality' | 'verification'
+  >('pipeline');
 
   // Multi-Stage Pipeline State (Stage 1, 2, 3)
   const [currentStage, setCurrentStage] = useState<1 | 2 | 3>(1);
@@ -90,50 +104,62 @@ export const HistoricalDataView: React.FC = () => {
   const [importSuccessResult, setImportSuccessResult] = useState<{ batchId: string; count: number } | null>(null);
   const [skipRejectedRows, setSkipRejectedRows] = useState(true);
 
-  // Existing Uploaded Files & Transactions lists
+  // Persistent Datasets
   const [uploadedFilesList, setUploadedFilesList] = useState<UploadedFileMetadataDoc[]>([]);
   const [historicalTxList, setHistoricalTxList] = useState<HistoricalTransactionDoc[]>([]);
-  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('');
+  const [importBatchesList, setImportBatchesList] = useState<ImportBatchDoc[]>([]);
+  const [isLoadingAll, setIsLoadingAll] = useState(false);
+
+  // Filter pass-through state for Explorer
+  const [explorerBatchFilter, setExplorerBatchFilter] = useState<string>('');
+  const [explorerStatusFilter, setExplorerStatusFilter] = useState<string>('ALL');
+
+  // Modals State
+  const [selectedBatchModal, setSelectedBatchModal] = useState<ImportBatchDoc | null>(null);
+  const [selectedTxModal, setSelectedTxModal] = useState<HistoricalTransactionDoc | null>(null);
 
   // 16-Test Verification Suite State
   const [testResults, setTestResults] = useState<VerificationTestCaseResult[]>([]);
   const [isRunningTests, setIsRunningTests] = useState(false);
 
-  // Load files and transactions on tab change
-  useEffect(() => {
-    if (activeTab === 'files') {
-      loadUploadedFiles();
-    } else if (activeTab === 'transactions') {
-      loadHistoricalTransactions();
-    }
-  }, [activeTab]);
-
-  const loadUploadedFiles = async () => {
-    setIsLoadingFiles(true);
+  // Initial Data Load
+  const loadAllHistoricalData = async () => {
+    setIsLoadingAll(true);
     try {
-      const files = await listUploadedFiles(100);
+      const [files, txs, batches] = await Promise.all([
+        listUploadedFiles(100),
+        listHistoricalTransactions({ limit: 1000 }),
+        listImportBatches(50),
+      ]);
       setUploadedFilesList(files);
+      setHistoricalTxList(txs);
+      setImportBatchesList(batches);
     } catch (err) {
-      console.error('Failed to load files:', err);
+      console.error('Failed to load historical data:', err);
     } finally {
-      setIsLoadingFiles(false);
+      setIsLoadingAll(false);
     }
   };
 
-  const loadHistoricalTransactions = async (batchId?: string) => {
-    setIsLoadingFiles(true);
-    try {
-      const txs = await listHistoricalTransactions({
-        importBatchId: batchId || undefined,
-        limit: 150,
-      });
-      setHistoricalTxList(txs);
-    } catch (err) {
-      console.error('Failed to load transactions:', err);
-    } finally {
-      setIsLoadingFiles(false);
-    }
+  useEffect(() => {
+    loadAllHistoricalData();
+  }, []);
+
+  // Filter transactions when batch filter changes or on demand
+  const handleSelectBatchForExplorer = (batchId: string) => {
+    setExplorerBatchFilter(batchId);
+    setActiveTab('explorer');
+  };
+
+  const handleSelectStatusForExplorer = (status: string) => {
+    setExplorerStatusFilter(status);
+    setActiveTab('explorer');
+  };
+
+  const handleFilterByItem = (skuOrDesc: string) => {
+    setExplorerBatchFilter('');
+    setExplorerStatusFilter('ALL');
+    setActiveTab('explorer');
   };
 
   // Run 16-Test Suite
@@ -299,8 +325,8 @@ export const HistoricalDataView: React.FC = () => {
         'success'
       );
 
-      // Refresh files list
-      loadUploadedFiles();
+      // Refresh all datasets in background
+      loadAllHistoricalData();
     } catch (err: any) {
       console.error('Commit error:', err);
       addToast('Commit Failed', err?.message || 'Error saving transactions to Firestore', 'error');
@@ -394,11 +420,21 @@ export const HistoricalDataView: React.FC = () => {
         </div>
       </div>
 
+      {/* Top Aggregate KPI Metric Cards */}
+      <HistoricalSummaryCards
+        transactions={historicalTxList}
+        batches={importBatchesList}
+        files={uploadedFilesList}
+        onFilterStatus={(status) => {
+          handleSelectStatusForExplorer(status);
+        }}
+      />
+
       {/* Navigation Sub-Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('pipeline')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'pipeline'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -409,37 +445,71 @@ export const HistoricalDataView: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('files')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'files'
+          onClick={() => setActiveTab('batches')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === 'batches'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
           }`}
         >
           <FileSpreadsheet className="w-4 h-4" />
-          Uploaded Spreadsheets
-          {uploadedFilesList.length > 0 && (
+          Import Batches & Audit
+          {importBatchesList.length > 0 && (
             <span className="text-[10px] bg-indigo-500/30 text-indigo-200 px-1.5 py-0.2 rounded-full">
-              {uploadedFilesList.length}
+              {importBatchesList.length}
             </span>
           )}
         </button>
 
         <button
-          onClick={() => setActiveTab('transactions')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'transactions'
+          onClick={() => setActiveTab('explorer')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === 'explorer'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
           }`}
         >
           <Layers className="w-4 h-4" />
-          Historical Transactions Explorer
+          Record Explorer
+          {historicalTxList.length > 0 && (
+            <span className="text-[10px] bg-sky-500/30 text-sky-200 px-1.5 py-0.2 rounded-full">
+              {historicalTxList.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('items')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === 'items'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          Item Consumption Summaries
+        </button>
+
+        <button
+          onClick={() => setActiveTab('quality')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+            activeTab === 'quality'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4" />
+          Data Quality Hub
+          {historicalTxList.filter((t) => t.dataQualityStatus !== 'VALID').length > 0 && (
+            <span className="text-[10px] bg-amber-500/30 text-amber-200 px-1.5 py-0.2 rounded-full">
+              {historicalTxList.filter((t) => t.dataQualityStatus !== 'VALID').length}
+            </span>
+          )}
         </button>
 
         <button
           onClick={() => setActiveTab('verification')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
             activeTab === 'verification'
               ? 'bg-indigo-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -557,9 +627,7 @@ export const HistoricalDataView: React.FC = () => {
               <div className="flex flex-wrap gap-3 pt-2">
                 <button
                   onClick={() => {
-                    setActiveTab('transactions');
-                    setSelectedBatchFilter(importSuccessResult.batchId);
-                    loadHistoricalTransactions(importSuccessResult.batchId);
+                    handleSelectBatchForExplorer(importSuccessResult.batchId);
                   }}
                   className="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-all cursor-pointer"
                 >
@@ -1326,183 +1394,60 @@ export const HistoricalDataView: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: UPLOADED SPREADSHEETS (METADATA IN FIRESTORE) */}
+      {/* TAB 2: IMPORT BATCHES & AUDIT LOGS */}
       {/* ========================================================================= */}
-      {activeTab === 'files' && (
-        <div className="bg-slate-900/40 rounded-2xl border border-slate-800 p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-white">Uploaded Procurement Spreadsheets</h3>
-              <p className="text-xs text-slate-400">
-                Audit records of all files uploaded and registered in Firestore collection{' '}
-                <span className="font-mono text-indigo-300">uploaded_files</span>.
-              </p>
-            </div>
-            <button
-              onClick={loadUploadedFiles}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoadingFiles ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 font-mono text-[11px] border-b border-slate-800">
-                <tr>
-                  <th className="py-2.5 px-3">Original Filename</th>
-                  <th className="py-2.5 px-3">Batch ID</th>
-                  <th className="py-2.5 px-3">Uploaded By</th>
-                  <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3">Row Stats</th>
-                  <th className="py-2.5 px-3">Download</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {uploadedFilesList.map((f) => (
-                  <tr key={f.fileId} className="hover:bg-slate-800/30">
-                    <td className="py-2.5 px-3 font-semibold text-white flex items-center gap-2">
-                      <FileSpreadsheet className="w-4 h-4 text-indigo-400 shrink-0" />
-                      <span className="truncate max-w-[200px]">{f.originalFilename}</span>
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-[11px] text-indigo-300">{f.importBatchId}</td>
-                    <td className="py-2.5 px-3 text-slate-300">{f.uploadedBy?.name || 'Authorized User'}</td>
-                    <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">
-                      {new Date(f.uploadedAt).toLocaleDateString()}
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                          f.importStatus === 'COMPLETED'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        }`}
-                      >
-                        {f.importStatus}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-400">
-                      {f.validRows + f.correctedRows}/{f.totalRows} valid
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <a
-                        href={`/api/files/download/${f.fileId}`}
-                        download
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        Download
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {uploadedFilesList.length === 0 && !isLoadingFiles && (
-            <div className="p-8 text-center text-slate-500 text-xs">
-              No spreadsheet uploads registered yet. Use the Upload & Clean Pipeline to import your first file.
-            </div>
-          )}
-        </div>
+      {activeTab === 'batches' && (
+        <ImportBatchesView
+          batches={importBatchesList}
+          files={uploadedFilesList}
+          isLoading={isLoadingAll}
+          onRefresh={loadAllHistoricalData}
+          onSelectBatch={(batch) => setSelectedBatchModal(batch)}
+          onFilterTransactions={(batchId) => handleSelectBatchForExplorer(batchId)}
+          onNavigateToUpload={() => setActiveTab('pipeline')}
+        />
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: HISTORICAL TRANSACTIONS EXPLORER */}
+      {/* TAB 3: HISTORICAL RECORD EXPLORER */}
       {/* ========================================================================= */}
-      {activeTab === 'transactions' && (
-        <div className="bg-slate-900/40 rounded-2xl border border-slate-800 p-6 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-sm font-bold text-white">Historical Transaction Store</h3>
-              <p className="text-xs text-slate-400">
-                Active consumption and purchase records in Firestore collection{' '}
-                <span className="font-mono text-indigo-300">historical_transactions</span>.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Filter by Batch ID..."
-                value={selectedBatchFilter}
-                onChange={(e) => setSelectedBatchFilter(e.target.value)}
-                className="px-3 py-1.5 text-xs rounded-xl bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
-              />
-              <button
-                onClick={() => loadHistoricalTransactions(selectedBatchFilter)}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all cursor-pointer"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-800/60 text-slate-400 font-mono text-[11px] border-b border-slate-800">
-                <tr>
-                  <th className="py-2.5 px-3">Tx ID</th>
-                  <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3">Standardized Item Description</th>
-                  <th className="py-2.5 px-3">SKU</th>
-                  <th className="py-2.5 px-3">Purchased</th>
-                  <th className="py-2.5 px-3">Consumed</th>
-                  <th className="py-2.5 px-3">Unit</th>
-                  <th className="py-2.5 px-3">Plant / Yard</th>
-                  <th className="py-2.5 px-3">Batch ID</th>
-                  <th className="py-2.5 px-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {historicalTxList.map((tx) => (
-                  <tr key={tx.transactionId} className="hover:bg-slate-800/30">
-                    <td className="py-2 px-3 font-mono text-[10px] text-slate-400">{tx.transactionId}</td>
-                    <td className="py-2 px-3 font-mono text-[11px] whitespace-nowrap">{tx.transactionDate}</td>
-                    <td className="py-2 px-3 font-medium text-white max-w-[240px] truncate">
-                      {tx.standardizedItemDescription}
-                    </td>
-                    <td className="py-2 px-3 font-mono text-[10px] text-indigo-300">{tx.itemId || '—'}</td>
-                    <td className="py-2 px-3 font-mono text-emerald-400">
-                      {tx.quantityPurchased !== undefined ? tx.quantityPurchased : '—'}
-                    </td>
-                    <td className="py-2 px-3 font-mono text-amber-400">
-                      {tx.quantityConsumed !== undefined ? tx.quantityConsumed : '—'}
-                    </td>
-                    <td className="py-2 px-3 font-mono text-[10px] text-slate-400">{tx.unit}</td>
-                    <td className="py-2 px-3 text-slate-300 truncate max-w-[140px]">{tx.siteLocation}</td>
-                    <td className="py-2 px-3 font-mono text-[10px] text-slate-400">{tx.importBatchId}</td>
-                    <td className="py-2 px-3">
-                      <span
-                        className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
-                          tx.dataQualityStatus === 'VALID'
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                            : tx.dataQualityStatus === 'CORRECTED'
-                            ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                        }`}
-                      >
-                        {tx.dataQualityStatus}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {historicalTxList.length === 0 && !isLoadingFiles && (
-            <div className="p-8 text-center text-slate-500 text-xs">
-              No historical transactions found in database for this query.
-            </div>
-          )}
-        </div>
+      {activeTab === 'explorer' && (
+        <HistoricalExplorerView
+          transactions={historicalTxList}
+          isLoading={isLoadingAll}
+          onRefresh={loadAllHistoricalData}
+          onSelectTransaction={(tx) => setSelectedTxModal(tx)}
+          onSelectBatch={(batchId) => handleSelectBatchForExplorer(batchId)}
+          initialBatchFilter={explorerBatchFilter}
+          initialStatusFilter={explorerStatusFilter}
+          onNavigateToUpload={() => setActiveTab('pipeline')}
+        />
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 4: 16-RULE SYSTEM VERIFICATION */}
+      {/* TAB 4: ITEM-LEVEL CONSUMPTION & PURCHASE SUMMARIES */}
+      {/* ========================================================================= */}
+      {activeTab === 'items' && (
+        <ItemLevelSummaryView
+          transactions={historicalTxList}
+          onFilterByItem={handleFilterByItem}
+          onNavigateToUpload={() => setActiveTab('pipeline')}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 5: DATA QUALITY HUB */}
+      {/* ========================================================================= */}
+      {activeTab === 'quality' && (
+        <DataQualityHubView
+          transactions={historicalTxList}
+          onSelectTransaction={(tx) => setSelectedTxModal(tx)}
+          onNavigateToUpload={() => setActiveTab('pipeline')}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 6: 16-RULE SYSTEM VERIFICATION */}
       {/* ========================================================================= */}
       {activeTab === 'verification' && (
         <div className="bg-slate-900/40 rounded-2xl border border-slate-800 p-6 space-y-6">
@@ -1572,6 +1517,23 @@ export const HistoricalDataView: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* Batch Detail Modal */}
+      {selectedBatchModal && (
+        <BatchDetailModal
+          batch={selectedBatchModal}
+          onClose={() => setSelectedBatchModal(null)}
+          onViewTransactions={(batchId) => handleSelectBatchForExplorer(batchId)}
+        />
+      )}
+
+      {/* Transaction Detail Modal */}
+      {selectedTxModal && (
+        <TransactionDetailModal
+          transaction={selectedTxModal}
+          onClose={() => setSelectedTxModal(null)}
+        />
       )}
     </div>
   );

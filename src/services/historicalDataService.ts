@@ -10,11 +10,13 @@ import * as XLSX from 'xlsx';
 import {
   HistoricalTransactionDoc,
   UploadedFileMetadataDoc,
+  ImportBatchDoc,
   DataQualityStatus,
 } from '../types/procurementDataModel';
 import {
   createUploadedFileMetadata,
   updateUploadedFileStatus,
+  createImportBatch,
   batchCreateHistoricalTransactions,
   logAuditEvent,
 } from './persistentDataService';
@@ -1048,6 +1050,8 @@ export async function commitHistoricalImport(
       siteLocation: row.cleaned.siteLocation,
       department: row.cleaned.department,
       unit: row.cleaned.unit,
+      unitPrice: row.cleaned.unitPrice,
+      totalValue: row.cleaned.totalValue,
       sourceFileId: fileMetadata.fileId,
       importBatchId: fileMetadata.importBatchId,
       dataQualityStatus: qualityStatus,
@@ -1055,8 +1059,43 @@ export async function commitHistoricalImport(
     };
   });
 
+  // Calculate dates and metrics
+  const validDates = rowsToImport
+    .map((r) => r.cleaned.transactionDate)
+    .filter(Boolean)
+    .sort();
+  const minDate = validDates.length > 0 ? validDates[0] : undefined;
+  const maxDate = validDates.length > 0 ? validDates[validDates.length - 1] : undefined;
+
+  const unmatchedCount = qualityReport.rows.filter((r) => r.itemMatch.status === 'UNMATCHED').length;
+  const lowConfCount = qualityReport.rows.filter((r) => r.itemMatch.status === 'LOW_CONFIDENCE').length;
+
   // Save to Firestore & local replica in chunks
   await batchCreateHistoricalTransactions(transactions, options?.onProgress);
+
+  // Create full ImportBatch audit document
+  const importBatchRecord: ImportBatchDoc = {
+    batchId: fileMetadata.importBatchId,
+    sourceFileId: fileMetadata.fileId,
+    originalFilename: fileMetadata.originalFilename,
+    uploadedBy: fileMetadata.uploadedBy,
+    uploadedAt: fileMetadata.uploadedAt,
+    importStartTime: now,
+    importCompletionTime: new Date().toISOString(),
+    totalRows: qualityReport.totalRows,
+    validRows: qualityReport.validCount,
+    correctedRows: qualityReport.correctedCount,
+    warningRows: qualityReport.warningCount,
+    rejectedRows: qualityReport.rejectedCount,
+    duplicateRows: qualityReport.duplicatesCount,
+    unmatchedItemCount: unmatchedCount,
+    lowConfidenceItemCount: lowConfCount,
+    dateRange: minDate && maxDate ? { minDate, maxDate } : undefined,
+    importStatus: qualityReport.warningCount > 0 ? 'COMPLETED_WITH_WARNINGS' : 'COMPLETED',
+    createdAt: now,
+    updatedAt: new Date().toISOString(),
+  };
+  await createImportBatch(importBatchRecord);
 
   // Update file metadata with completion stats
   await updateUploadedFileStatus(fileMetadata.fileId, 'COMPLETED', {
@@ -1077,7 +1116,7 @@ export async function commitHistoricalImport(
       role: 'PURCHASE_MANAGER',
     },
     action: 'HISTORICAL_DATA_IMPORTED',
-    entityType: 'HISTORICAL_TRANSACTION',
+    entityType: 'IMPORT_BATCH',
     entityId: fileMetadata.importBatchId,
     reason: `Imported ${transactions.length} historical consumption/purchase records from file ${fileMetadata.originalFilename}`,
     newValue: {
@@ -1085,6 +1124,7 @@ export async function commitHistoricalImport(
       importedCount: transactions.length,
       fileId: fileMetadata.fileId,
       cleanRate: qualityReport.cleanRate,
+      batchId: fileMetadata.importBatchId,
     },
   });
 

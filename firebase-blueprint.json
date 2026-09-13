@@ -412,6 +412,88 @@
       },
       "required": ["fileId", "originalFilename", "storagePath", "uploadedAt", "fileType", "fileSize", "importStatus", "createdAt", "updatedAt"]
     },
+    "ImportBatch": {
+      "title": "ImportBatch",
+      "description": "Full audit lifecycle record for historical data imports",
+      "type": "object",
+      "properties": {
+        "batchId": {
+          "type": "string",
+          "description": "Unique batch processing identifier",
+          "maxLength": 64
+        },
+        "sourceFileId": {
+          "type": "string",
+          "description": "Reference ID of uploaded source file",
+          "maxLength": 64
+        },
+        "originalFilename": {
+          "type": "string",
+          "description": "Original uploaded spreadsheet filename",
+          "maxLength": 255
+        },
+        "uploadedBy": {
+          "type": "object",
+          "description": "Authorized user metadata who imported this batch"
+        },
+        "uploadedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "importStartTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "importCompletionTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "totalRows": {
+          "type": "number"
+        },
+        "validRows": {
+          "type": "number"
+        },
+        "correctedRows": {
+          "type": "number"
+        },
+        "warningRows": {
+          "type": "number"
+        },
+        "rejectedRows": {
+          "type": "number"
+        },
+        "duplicateRows": {
+          "type": "number"
+        },
+        "unmatchedItemCount": {
+          "type": "number"
+        },
+        "lowConfidenceItemCount": {
+          "type": "number"
+        },
+        "dateRange": {
+          "type": "object"
+        },
+        "importStatus": {
+          "type": "string",
+          "enum": ["UPLOADED", "PROCESSING", "READY_FOR_IMPORT", "IMPORTING", "COMPLETED", "COMPLETED_WITH_WARNINGS", "FAILED", "CANCELLED"]
+        },
+        "errorMessage": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["batchId", "sourceFileId", "originalFilename", "uploadedBy", "uploadedAt", "importStartTime", "totalRows", "importStatus", "createdAt", "updatedAt"]
+    },
     "GateResult": {
       "title": "GateResult",
       "description": "Generic evaluation result from a verification gate",
@@ -593,6 +675,10 @@
     "/uploaded_files/{fileId}": {
       "schema": "UploadedFileMetadata",
       "description": "Metadata for uploaded spreadsheets and files"
+    },
+    "/import_batches/{batchId}": {
+      "schema": "ImportBatch",
+      "description": "Audit records and metrics for historical import batches"
     },
     "/manager_decisions/{decisionId}": {
       "schema": "ManagerDecision",

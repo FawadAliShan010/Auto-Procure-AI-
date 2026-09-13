@@ -21,11 +21,18 @@ import {
   ArrowUpRight,
   Split,
   RefreshCw,
+  Clock,
+  Calendar,
+  BarChart3,
+  ShieldAlert,
+  Info,
 } from 'lucide-react';
 import { INITIAL_PURCHASE_REQUESTS } from '../data/mockProcurementData';
 
 export const AnalysisView: React.FC = () => {
   const { currentAnalysisPR, setCurrentAnalysisPR, navigateTo } = useProcure();
+  const [gate4ViewMode, setGate4ViewMode] = useState<'ENTERPRISE_24M' | 'QUICK_90D'>('ENTERPRISE_24M');
+  const [showFullEvidence, setShowFullEvidence] = useState(false);
 
   // If no PR currently active in context, default to the Steel Pipe demo (PR-2025-0839)
   const pr = currentAnalysisPR || INITIAL_PURCHASE_REQUESTS[3];
@@ -549,46 +556,171 @@ export const AnalysisView: React.FC = () => {
         />
 
         {/* ========================================================
-            GATE 4 — USAGE ANALYSIS
+            GATE 4 — UPGRADED HISTORICAL CONSUMPTION & REQUIREMENT ANALYSIS
             ======================================================== */}
         <GateCard
           id="gate-4-usage-analysis"
           gateNumber="04"
-          title="Gate 4 — Usage Analysis"
-          subtitle="Preceding 90-Day Velocity & Coverage Months"
-          status={gate4?.status || 'High'}
+          title="Gate 4 — Historical Consumption Intelligence"
+          subtitle="24-Month Consumption Velocity, YoY Trend & Anomaly Detection"
+          status={
+            gate4?.recommendationStatus === 'POTENTIAL_EXCESS'
+              ? 'High'
+              : gate4?.recommendationStatus === 'ALIGNED_WITH_HISTORY'
+              ? 'Optimal'
+              : (gate4?.status || 'High')
+          }
           icon={<TrendingUp className="w-4 h-4 text-purple-500" />}
           inputs={
-            <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-200 text-xs">
-              <span className="text-slate-500 font-medium">Historical Window:</span>
-              <span className="font-mono font-semibold text-slate-800">Preceding 90 Days (Jun – Aug)</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between bg-white p-2 rounded border border-slate-200 text-xs">
+                <span className="text-slate-500 font-medium">Historical Baseline:</span>
+                <span className="font-mono font-bold px-2 py-0.5 rounded text-[11px] bg-purple-50 text-purple-800 border border-purple-200">
+                  {gate4?.availablePeriodLabel || '24 MONTHS (FULL BASELINE)'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] px-1">
+                <span className="text-slate-500">View Mode:</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setGate4ViewMode('ENTERPRISE_24M')}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${
+                      gate4ViewMode === 'ENTERPRISE_24M'
+                        ? 'bg-purple-600 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    24M Full Baseline
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGate4ViewMode('QUICK_90D')}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded transition-colors ${
+                      gate4ViewMode === 'QUICK_90D'
+                        ? 'bg-purple-600 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    90-Day Velocity
+                  </button>
+                </div>
+              </div>
             </div>
           }
           results={
             <div className="divide-y divide-slate-100 text-xs">
-              <div className="flex items-center justify-between p-2.5">
-                <span className="text-slate-500 font-medium">Requested Quantity</span>
+              <div className="flex items-center justify-between p-2.5 bg-purple-50/20">
+                <div>
+                  <span className="text-slate-700 font-semibold block">Requested Quantity</span>
+                  <span className="text-[10px] text-slate-400">Current Requisition Line</span>
+                </div>
                 <span className="font-mono font-bold text-indigo-700 text-sm">
                   {gate4?.requestedQuantity ?? pr.quantity} units
                 </span>
               </div>
               <div className="flex items-center justify-between p-2.5">
-                <span className="text-slate-500 font-medium">Average Monthly Usage</span>
+                <div>
+                  <span className="text-slate-600 font-medium block">Annualized Consumption</span>
+                  <span className="text-[10px] text-slate-400">12-Month Extrapolated Pace</span>
+                </div>
                 <span className="font-mono font-bold text-slate-800">
-                  {gate4?.avgMonthlyUsage ?? 12} units / month
+                  {gate4?.annualizedConsumption ?? (gate4?.avgMonthlyUsage ? gate4.avgMonthlyUsage * 12 : 144)} units / yr
                 </span>
               </div>
               <div className="flex items-center justify-between p-2.5">
-                <span className="text-slate-500 font-medium">Coverage Months</span>
-                <span className="font-mono font-bold text-amber-600">
-                  {gate4?.monthsOfSupply ?? 4.2} months of supply
+                <div>
+                  <span className="text-slate-600 font-medium block">Monthly Average Run-Rate</span>
+                  <span className="text-[10px] text-slate-400">Historical Monthly Pace</span>
+                </div>
+                <span className="font-mono font-bold text-slate-800">
+                  {gate4?.avgMonthlyUsage ?? 12} units / mo
                 </span>
               </div>
               <div className="flex items-center justify-between p-2.5">
-                <span className="text-slate-500 font-medium">Recommended Quantity</span>
-                <span className="font-mono font-bold text-emerald-700 text-sm">
-                  {gate4?.recommendedQuantity ?? 5} units
+                <div>
+                  <span className="text-slate-600 font-medium block">Historical Variance</span>
+                  <span className="text-[10px] text-slate-400">Delta vs Annual Consumption</span>
+                </div>
+                <span
+                  className={`font-mono font-bold ${
+                    (gate4?.quantityVariance ?? 0) > 0 ? 'text-amber-700' : 'text-emerald-700'
+                  }`}
+                >
+                  {(gate4?.quantityVariance ?? 0) > 0
+                    ? `+${gate4?.quantityVariance} units (+${gate4?.percentageVariance}%)`
+                    : `${gate4?.quantityVariance ?? 0} units (${gate4?.percentageVariance ?? 0}%)`}
                 </span>
+              </div>
+            </div>
+          }
+          relevantMetrics={
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                  <span className="text-slate-500 block font-medium">Consumption Trend:</span>
+                  <span
+                    className={`font-bold inline-flex items-center gap-1 ${
+                      gate4?.consumptionTrend === 'INCREASING'
+                        ? 'text-indigo-700'
+                        : gate4?.consumptionTrend === 'DECREASING'
+                        ? 'text-amber-700'
+                        : 'text-emerald-700'
+                    }`}
+                  >
+                    <TrendingUp className="w-3 h-3" />
+                    {gate4?.consumptionTrend || 'STABLE'}
+                  </span>
+                </div>
+                <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                  <span className="text-slate-500 block font-medium">Coverage Months:</span>
+                  <span className="font-mono font-bold text-slate-800">
+                    {gate4?.monthsOfSupply ?? 4.2} months
+                  </span>
+                </div>
+              </div>
+
+              {/* Recommendation Pill */}
+              <div
+                className={`p-2.5 rounded-lg border text-xs ${
+                  gate4?.recommendationStatus === 'POTENTIAL_EXCESS'
+                    ? 'bg-amber-50/90 border-amber-300 text-amber-950'
+                    : gate4?.recommendationStatus === 'ALIGNED_WITH_HISTORY'
+                    ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950'
+                    : 'bg-indigo-50/90 border-indigo-300 text-indigo-950'
+                }`}
+              >
+                <div className="flex items-center justify-between font-bold mb-1">
+                  <span className="flex items-center gap-1.5">
+                    {gate4?.recommendationStatus === 'POTENTIAL_EXCESS' ? (
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    )}
+                    {gate4?.recommendationStatusLabel || (gate4?.recommendationStatus || 'ALIGNED_WITH_HISTORY').replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.2 bg-white rounded border border-slate-200">
+                    {gate4?.suggestedAction || 'proceed to review'}
+                  </span>
+                </div>
+
+                {gate4?.keyEvidence && gate4.keyEvidence.length > 0 && (
+                  <ul className="list-disc list-inside space-y-0.5 text-[11px] opacity-90 mt-1.5">
+                    {gate4.keyEvidence.slice(0, showFullEvidence ? 5 : 2).map((ev, i) => (
+                      <li key={i}>{ev}</li>
+                    ))}
+                  </ul>
+                )}
+
+                {gate4?.keyEvidence && gate4.keyEvidence.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFullEvidence(!showFullEvidence)}
+                    className="text-[10px] font-bold text-slate-700 underline mt-1 block"
+                  >
+                    {showFullEvidence ? 'Show less evidence' : `+${gate4.keyEvidence.length - 2} more evidence points`}
+                  </button>
+                )}
               </div>
             </div>
           }
@@ -604,7 +736,7 @@ export const AnalysisView: React.FC = () => {
           explanation={
             <span>
               {gate4?.usageFlagMessage ||
-                `Requested ${pr.quantity} units represents ${gate4?.monthsOfSupply ?? 4.2} months of inventory against the 90-day baseline of ${gate4?.avgMonthlyUsage ?? 12} units/month.`}{' '}
+                `Requested ${pr.quantity} units represents ${gate4?.monthsOfSupply ?? 4.2} months of inventory against the baseline of ${gate4?.avgMonthlyUsage ?? 12} units/month.`}{' '}
               By transferring 45 units from Warehouse B, the recommended external purchase is reduced to <strong>{gate4?.recommendedQuantity ?? 5} units</strong>.
             </span>
           }

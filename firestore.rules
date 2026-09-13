@@ -135,6 +135,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // 6.5. Import Batches (/import_batches/{batchId})
+    match /import_batches/{batchId} {
+      allow read: if isPurchaseManager();
+      allow create, update: if isPurchaseManager() && isValidId(batchId);
+      allow delete: if isAdmin();
+    }
+
     // 7. Purchase Manager Decisions (/manager_decisions/{decisionId})
     // Only an authorized PURCHASE_MANAGER or ADMIN may create a manager decision
     // Requisitioners must NEVER be able to create or modify a manager decision

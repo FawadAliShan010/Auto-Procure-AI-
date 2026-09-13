@@ -131,21 +131,82 @@ export interface Gate4Result {
     month: string;
     usage: number;
   }>;
+  // Extended Historical Intelligence Metrics (Stage 1 & Stage 2)
+  availablePeriodLabel?: string;
+  annualizedConsumption?: number | null;
+  totalPurchasedQuantity?: number | null;
+  totalConsumedQuantity?: number | null;
+  quantityVariance?: number | null;
+  percentageVariance?: number | null;
+  consumptionTrend?: 'STABLE' | 'INCREASING' | 'DECREASING' | 'VOLATILE' | 'INSUFFICIENT_DATA';
+  recommendationStatus?: string;
+  recommendationStatusLabel?: string;
+  keyEvidence?: string[];
+  suggestedAction?: string;
+  isExcessFlagged?: boolean;
+  dataQualityWarning?: string;
+  historicalAnalysis?: any;
 }
 
 export interface AIDecisionResult {
   decision: DecisionType;
   headline: string;
+  calculations?: {
+    totalCost: number;
+    budgetVariance: number;
+    remainingBudget: number;
+    budgetUtilizationPercent?: number;
+    inventoryTransferQuantity: number;
+    availableTransferStock?: number;
+    primaryTransferSource?: string;
+    averageMonthlyUsage: number;
+    coverageMonths: number;
+    recommendedQuantity: number;
+    estimatedSavings: number;
+    savingsBreakdown: {
+      transferSavings: number;
+      volumeReductionSavings: number;
+    };
+    [key: string]: any;
+  };
   reasoning: string[];
   recommendedActions: Array<{
-    type: 'transfer' | 'purchase' | 'review' | 'budget_override' | 'cancel' | 'clarification';
+    type?: string;
     text: string;
     quantity?: number;
     site?: string;
   }>;
-  estimatedSavings: number;
-  purchaseQuantity: number;
-  transferQuantity: number;
+  confidenceScore?: number;
+  appliedThresholds?: Record<string, any>;
+  auditFlags?: string[];
+  estimatedSavings?: number;
+  transferQuantity?: number;
+  purchaseQuantity?: number;
+  recommendedQuantity?: number;
+  primaryTransferSource?: string;
+  [key: string]: any;
+}
+
+export interface RequisitionLineItem {
+  id: string;
+  sku?: string;
+  itemDescription: string;
+  quantity: number;
+  estimatedPrice: number;
+  unit?: string;
+  gate1?: Gate1Result;
+  gate2?: Gate2Result;
+  gate3?: Gate3Result;
+  gate4?: Gate4Result;
+  decisionResult?: AIDecisionResult;
+  managerDecision?: {
+    decision: 'APPROVE' | 'REDUCE' | 'HOLD' | 'REJECT' | 'CLARIFICATION' | 'REANALYSIS';
+    approvedQuantity: number;
+    overrideReasonCategory?: string;
+    justification: string;
+    managerId: string;
+    timestamp: string;
+  };
 }
 
 export interface PurchaseRequest {
@@ -166,6 +227,9 @@ export interface PurchaseRequest {
   gate3?: Gate3Result;
   gate4?: Gate4Result;
   decisionResult?: AIDecisionResult;
+
+  // Multi-item PR support
+  lineItems?: RequisitionLineItem[];
 
   erpSynced?: boolean;
   erpRefId?: string;

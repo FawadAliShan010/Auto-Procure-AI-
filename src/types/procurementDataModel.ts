@@ -36,6 +36,16 @@ export type FileImportStatus =
   | 'FAILED'
   | 'PARTIAL';
 
+export type ImportBatchStatus =
+  | 'UPLOADED'
+  | 'PROCESSING'
+  | 'READY_FOR_IMPORT'
+  | 'IMPORTING'
+  | 'COMPLETED'
+  | 'COMPLETED_WITH_WARNINGS'
+  | 'FAILED'
+  | 'CANCELLED';
+
 export type DataQualityStatus = 'VALID' | 'WARNING' | 'CORRECTED' | 'FLAGGED';
 
 export type AuditEntityType =
@@ -43,6 +53,7 @@ export type AuditEntityType =
   | 'LINE_ITEM'
   | 'ITEM_MASTER'
   | 'UPLOADED_FILE'
+  | 'IMPORT_BATCH'
   | 'HISTORICAL_TRANSACTION'
   | 'USER'
   | 'USER_PROFILE';
@@ -142,10 +153,12 @@ export interface ItemMasterDoc {
   itemId: string;
   officialSku: string;
   standardizedDescription: string;
-  category: string;
-  unit: string;
+  category?: string;
+  unit?: string;
   glCode?: string;
   unspscCode?: string;
+  unspscCategory?: string;
+  avgMonthlyConsumption?: number;
   aliases: string[]; // Alternate synonyms, common typos
   active: boolean;
   createdAt: string;
@@ -168,7 +181,11 @@ export interface HistoricalTransactionDoc {
   siteLocation?: string;
   department?: string;
   unit?: string;
+  unitPrice?: number;
+  totalValue?: number;
   sourceFileId?: string; // Links to UploadedFileMetadataDoc
+  originalFileId?: string;
+  rowIndex?: number;
   importBatchId?: string;
   dataQualityStatus?: DataQualityStatus;
   createdAt: string;
@@ -198,6 +215,41 @@ export interface UploadedFileMetadataDoc {
   warningRows: number;
   rejectedRows: number;
   importBatchId: string;
+  errorMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * 7. Import Batch Document
+ * Path: /import_batches/{batchId}
+ * Tracks full audit lifecycle of each ingestion execution
+ */
+export interface ImportBatchDoc {
+  batchId: string;
+  sourceFileId: string;
+  originalFilename: string;
+  uploadedBy: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  uploadedAt: string;
+  importStartTime: string;
+  importCompletionTime?: string;
+  totalRows: number;
+  validRows: number;
+  correctedRows: number;
+  warningRows: number;
+  rejectedRows: number;
+  duplicateRows: number;
+  unmatchedItemCount: number;
+  lowConfidenceItemCount: number;
+  dateRange?: {
+    minDate: string;
+    maxDate: string;
+  };
+  importStatus: ImportBatchStatus;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
